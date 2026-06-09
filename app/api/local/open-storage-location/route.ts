@@ -69,7 +69,10 @@ function openLocation(directory: string, file: string | null) {
       stdio: "ignore",
       windowsHide: false,
     }).unref();
-    return;
+    return {
+      opened: true,
+      command: "explorer.exe",
+    };
   }
 
   if (process.platform === "darwin") {
@@ -77,10 +80,37 @@ function openLocation(directory: string, file: string | null) {
       detached: true,
       stdio: "ignore",
     }).unref();
-    return;
+    return {
+      opened: true,
+      command: "open",
+    };
   }
 
-  throw new Error("当前只支持在 Windows 和 macOS 打开本地目录。");
+  if (process.platform === "linux") {
+    if (process.env.DISPLAY || process.env.WAYLAND_DISPLAY) {
+      spawn("xdg-open", [directory], {
+        detached: true,
+        stdio: "ignore",
+      }).unref();
+      return {
+        opened: true,
+        command: "xdg-open",
+      };
+    }
+
+    return {
+      opened: false,
+      command: null,
+      reason:
+        "当前 Linux 环境没有桌面会话，无法打开文件管理器；请直接使用返回的目录路径。",
+    };
+  }
+
+  return {
+    opened: false,
+    command: null,
+    reason: `当前平台 ${process.platform} 不支持打开本地目录。`,
+  };
 }
 
 async function getExistingFile(file: string | null) {
@@ -109,10 +139,11 @@ export async function POST(request: Request) {
 
     await mkdir(resolved.directory, { recursive: true });
     const existingFile = await getExistingFile(resolved.file);
-    openLocation(resolved.directory, existingFile);
+    const openResult = openLocation(resolved.directory, existingFile);
 
     return NextResponse.json({
       target,
+      openResult,
       openedDirectory: resolved.directory,
       file: existingFile ?? resolved.file,
       storage: resolved.storage,

@@ -2,6 +2,10 @@
   "name": "byteplus-dancing-together",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.18.2",
+  "engines": {
+    "node": ">=20.9"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

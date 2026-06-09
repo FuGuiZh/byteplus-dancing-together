@@ -1,9 +1,17 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const appDirectoryName = "BytePlus Dancing Together";
+const linuxAppDirectoryName = "byteplus-dancing-together";
+const dataDirectoryEnvKey = "BYTEPLUS_DANCING_TOGETHER_DATA_DIR";
 
 export function getUserDataDirectory() {
+  const configuredDirectory = process.env[dataDirectoryEnvKey]?.trim();
+
+  if (configuredDirectory) {
+    return resolve(configuredDirectory);
+  }
+
   if (process.platform === "win32") {
     return join(
       process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"),
@@ -15,7 +23,11 @@ export function getUserDataDirectory() {
     return join(homedir(), "Library", "Application Support", appDirectoryName);
   }
 
-  throw new Error("当前本地持久化只支持 Windows 和 macOS。");
+  const xdgDataHome = process.env.XDG_DATA_HOME?.trim();
+  return join(
+    xdgDataHome || join(homedir(), ".local", "share"),
+    linuxAppDirectoryName
+  );
 }
 
 export function getUserDataFilePath(fileName: string) {

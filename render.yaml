@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: byteplus-dancing-together
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    plan: starter
+    disk:
+      name: byteplus-dancing-together-data
+      mountPath: /data
+      sizeGB: 10
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: BYTEPLUS_DANCING_TOGETHER_DATA_DIR
+        value: /data/byteplus-dancing-together
+      - key: BYTEPLUS_REGION
+        value: ap-southeast-1
+      - key: BYTEPLUS_PROJECT_NAME
+        value: default
+      - key: APP_PUBLIC_URL
+        sync: false
+      - key: BYTEPLUS_REAL_PERSON_CALLBACK_URL
+        sync: false
+      - key: BYTEPLUS_VIDEO_TASK_CALLBACK_URL
+        sync: false
+      - key: BYTEPLUS_IAM_ACCESS_KEY_ID
+        sync: false
+      - key: BYTEPLUS_IAM_SECRET_ACCESS_KEY
+        sync: false
+      - key: BYTEPLUS_MODELARK_API_KEY
+        sync: false
+      - key: BYTEPLUS_SEEDANCE_2_ENDPOINT_ID
+        sync: false
+      - key: BYTEPLUS_SEEDANCE_2_FAST_ENDPOINT_ID
+        sync: false
