@@ -23,6 +23,8 @@ export function GeneratedContentAssetsWorkspace() {
   const [syncing, setSyncing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const syncRequestPath =
+    "/api/local/generated-content-assets?page_size=50&max_pages=5&download_limit=8&download_timeout_ms=12000";
 
   const applyPayload = React.useCallback((payload: GeneratedContentAssetsResponse) => {
     setAssets(Array.isArray(payload.assets) ? payload.assets : []);
@@ -60,12 +62,24 @@ export function GeneratedContentAssetsWorkspace() {
   const syncAssets = React.useCallback(async () => {
     setSyncing(true);
     setError(null);
+    setLastSyncPayload({
+      state: "syncing",
+      message:
+        "正在查询 ModelArk 最近 7 天 succeeded 任务，并下载本批可用视频。",
+      request: {
+        method: "POST",
+        path: syncRequestPath,
+      },
+    });
     let receivedPayload = false;
+    const abortController = new AbortController();
+    const timeoutId = window.setTimeout(() => abortController.abort(), 150000);
 
     try {
-      const response = await fetch("/api/local/generated-content-assets", {
+      const response = await fetch(syncRequestPath, {
         cache: "no-store",
         method: "POST",
+        signal: abortController.signal,
       });
       const payload = (await response.json()) as GeneratedContentAssetsResponse & {
         message?: string;
@@ -79,25 +93,28 @@ export function GeneratedContentAssetsWorkspace() {
 
       applyPayload(payload);
     } catch (requestError) {
+      const message =
+        requestError instanceof DOMException && requestError.name === "AbortError"
+          ? "同步请求超过 150 秒未完成，前端已停止等待；后端可能仍在下载，请稍后点击读取本地。"
+          : requestError instanceof Error
+            ? requestError.message
+            : "ModelArk 任务同步失败。";
+
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "ModelArk 任务同步失败。"
+        message
       );
       if (!receivedPayload) {
         setLastSyncPayload({
           code: "CLIENT_SYNC_ERROR",
-          message:
-            requestError instanceof Error
-              ? requestError.message
-              : "ModelArk 任务同步失败。",
+          message,
         });
       }
     } finally {
+      window.clearTimeout(timeoutId);
       setSyncing(false);
       setLoading(false);
     }
-  }, [applyPayload]);
+  }, [applyPayload, syncRequestPath]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -181,6 +198,8 @@ export function GeneratedContentAssetsWorkspace() {
         <SyncSummary summary={syncSummary.summary} />
       ) : null}
 
+      {syncing ? <SyncingNotice /> : null}
+
       {error ? (
         <div className="mt-5 rounded-[var(--ui-radius)] border-border bg-destructive px-4 py-3 text-sm text-destructive-foreground [border-width:var(--ui-border-width)]">
           {error}
@@ -253,6 +272,9 @@ function SyncSummary({
     <div className="mt-5 flex flex-wrap gap-2">
       <Badge variant="outline">任务 {summary.receivedTasks}</Badge>
       <Badge variant="success">已下载 {summary.downloadedAssets}</Badge>
+      {summary.pendingDownloads > 0 ? (
+        <Badge variant="warning">待下载 {summary.pendingDownloads}</Badge>
+      ) : null}
       <Badge variant="secondary">新增 {summary.importedAssets}</Badge>
       <Badge variant="warning">跳过 {summary.skippedTasks}</Badge>
       {summary.failedDownloads > 0 ? (
@@ -261,6 +283,18 @@ function SyncSummary({
       {summary.remoteMissing > 0 ? (
         <Badge variant="destructive">缺少 URL {summary.remoteMissing}</Badge>
       ) : null}
+      <Badge variant="outline">本次下载上限 {summary.downloadLimit}</Badge>
+    </div>
+  );
+}
+
+function SyncingNotice() {
+  return (
+    <div className="mt-5 rounded-[var(--ui-radius)] border-border bg-card px-4 py-3 text-sm [border-width:var(--ui-border-width)]">
+      <div className="font-bold">正在同步最近 7 天任务...</div>
+      <div className="mt-1 text-muted-foreground">
+        已发起真实 API 查询；本次会限制下载数量并给每个视频下载设置超时，避免页面长时间无响应。
+      </div>
     </div>
   );
 }
@@ -276,7 +310,7 @@ function EmptyAssetsState({
     <div className="mt-12 rounded-[calc(var(--ui-radius)*1.4)] border-border bg-card p-8 [border-width:var(--ui-border-width)]">
       <div className="text-lg font-bold">还没有本地生成视频</div>
       <div className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-        点击同步会查询 ModelArk 最近 7 天 succeeded 任务；如果任务还带有有效 video_url，服务端会下载到本机用户目录后再进入资产库。
+        点击同步会查询 ModelArk 最近 7 天 succeeded 任务；如果任务还带有有效 video_url，服务端会先下载本批视频到本机用户目录，剩余结果会保留为待下载。
       </div>
       <Button className="mt-5" disabled={syncing} onClick={onSync}>
         <DatabaseZap className="mr-2 size-4" />

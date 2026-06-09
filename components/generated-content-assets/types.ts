@@ -57,7 +57,16 @@ export type GeneratedContentAssetsResponse = {
       downloadedAssets: number;
       failedDownloads: number;
       remoteMissing: number;
+      pendingDownloads: number;
       skippedTasks: number;
+      downloadLimit: number;
+      downloadTimeoutMs: number;
+    };
+    options?: {
+      pageSize?: number;
+      maxPages?: number;
+      downloadLimit?: number;
+      downloadTimeoutMs?: number;
     };
     provider?: unknown;
   };

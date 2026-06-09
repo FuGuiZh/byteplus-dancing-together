@@ -73,7 +73,15 @@ export type GeneratedContentAssetSyncSummary = {
   downloadedAssets: number;
   failedDownloads: number;
   remoteMissing: number;
+  pendingDownloads: number;
   skippedTasks: number;
+  downloadLimit: number;
+  downloadTimeoutMs: number;
+};
+
+export type GeneratedContentAssetSyncOptions = {
+  downloadLimit?: number;
+  downloadTimeoutMs?: number;
 };
 
 const legacySessionsFileName = "text-to-video-sessions.json";
@@ -592,7 +600,31 @@ async function getExistingFileSize(filePath: string | undefined) {
   }
 }
 
-async function ensureLocalVideoDownloaded(asset: GeneratedContentAsset) {
+function createPendingDownloadAsset(asset: GeneratedContentAsset, reason: string) {
+  return hydrateGeneratedAsset({
+    ...asset,
+    downloadStatus: "pending",
+    downloadError: reason,
+  });
+}
+
+async function fetchWithTimeout(url: string, timeoutMs: number) {
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      signal: abortController.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function ensureLocalVideoDownloaded(
+  asset: GeneratedContentAsset,
+  downloadTimeoutMs: number
+) {
   if (!asset.remoteVideoUrl) {
     return hydrateGeneratedAsset({
       ...asset,
@@ -623,7 +655,7 @@ async function ensureLocalVideoDownloaded(asset: GeneratedContentAsset) {
   }
 
   try {
-    const response = await fetch(asset.remoteVideoUrl);
+    const response = await fetchWithTimeout(asset.remoteVideoUrl, downloadTimeoutMs);
     if (!response.ok) {
       throw new Error(
         `视频下载失败：HTTP ${response.status} ${response.statusText}`.trim()
@@ -647,11 +679,16 @@ async function ensureLocalVideoDownloaded(asset: GeneratedContentAsset) {
       downloadError: undefined,
     });
   } catch (error) {
+    const message = getErrorMessage(error);
+
     return hydrateGeneratedAsset({
       ...asset,
       localVideoPath,
       downloadStatus: "failed",
-      downloadError: getErrorMessage(error),
+      downloadError:
+        message === "This operation was aborted"
+          ? `视频下载超时：超过 ${downloadTimeoutMs}ms 未完成。`
+          : message,
     });
   }
 }
@@ -750,8 +787,13 @@ export async function readGeneratedContentAssetById(assetId: string) {
   return state.assets.find((asset) => asset.id === assetId);
 }
 
-export async function syncGeneratedContentAssetsFromTasks(tasks: unknown[]) {
+export async function syncGeneratedContentAssetsFromTasks(
+  tasks: unknown[],
+  options: GeneratedContentAssetSyncOptions = {}
+) {
   const startedAt = new Date();
+  const downloadLimit = Math.max(0, options.downloadLimit ?? 8);
+  const downloadTimeoutMs = Math.max(1000, options.downloadTimeoutMs ?? 12000);
   const currentState = await readGeneratedContentAssetState();
   const sessionState = await readTextToVideoSessionState();
   const contexts = extractTaskContextsFromSessions(sessionState);
@@ -766,8 +808,12 @@ export async function syncGeneratedContentAssetsFromTasks(tasks: unknown[]) {
     downloadedAssets: 0,
     failedDownloads: 0,
     remoteMissing: 0,
+    pendingDownloads: 0,
     skippedTasks: 0,
+    downloadLimit,
+    downloadTimeoutMs,
   } satisfies GeneratedContentAssetSyncSummary;
+  let attemptedDownloads = 0;
 
   for (const task of tasks) {
     const importedAsset = normalizeProviderTaskToAsset(task, contexts);
@@ -792,7 +838,25 @@ export async function syncGeneratedContentAssetsFromTasks(tasks: unknown[]) {
       fileSizeBytes: current?.fileSizeBytes,
       updatedAt: Date.now(),
     } satisfies GeneratedContentAsset;
-    const downloadedAsset = await ensureLocalVideoDownloaded(mergedAsset);
+    const existingFileSize = await getExistingFileSize(mergedAsset.localVideoPath);
+    const downloadedAsset = existingFileSize
+      ? hydrateGeneratedAsset({
+          ...mergedAsset,
+          downloadStatus: "downloaded",
+          fileSizeBytes: existingFileSize,
+          downloadError: undefined,
+        })
+      : !mergedAsset.remoteVideoUrl
+        ? await ensureLocalVideoDownloaded(mergedAsset, downloadTimeoutMs)
+        : attemptedDownloads < downloadLimit
+          ? await (async () => {
+              attemptedDownloads += 1;
+              return ensureLocalVideoDownloaded(mergedAsset, downloadTimeoutMs);
+            })()
+          : createPendingDownloadAsset(
+              mergedAsset,
+              `本次同步已达到下载上限 ${downloadLimit} 个视频；再次点击同步会继续尝试未下载项。`
+            );
 
     if (!current) {
       summary.importedAssets += 1;
@@ -804,6 +868,8 @@ export async function syncGeneratedContentAssetsFromTasks(tasks: unknown[]) {
       summary.failedDownloads += 1;
     } else if (downloadedAsset.downloadStatus === "remote_missing") {
       summary.remoteMissing += 1;
+    } else if (downloadedAsset.downloadStatus === "pending") {
+      summary.pendingDownloads += 1;
     }
 
     currentAssets.set(downloadedAsset.id, downloadedAsset);
