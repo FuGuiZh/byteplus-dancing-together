@@ -476,6 +476,15 @@ stateDiagram-v2
 - `Moderation.Strategy=Skip` 要作为受控能力，默认不开放给普通用户。
 - `safety_identifier` 使用用户 ID 哈希，不传明文邮箱或手机号。
 
+### 7.5 生成内容归档
+
+作品库不能只依赖 ModelArk 历史任务记录：
+
+- `List video generation tasks` 只能查询最近 7 天任务，且范围受当前 API Key 权限限制。
+- 成功任务的 `content.video_url` 和 `content.last_frame_url` 通常只有 24 小时有效。
+- List/Retrieve 文档未承诺返回原始 prompt 或输入素材，因此产品侧要自己保存请求参数、会话上下文和最终成片文件。
+- 成功任务同步到作品库时，应先记录上游原始任务 JSON，再尽快把可访问的 `video_url` 下载到本地或对象存储。
+
 ## 8. MVP 接入建议
 
 第一阶段只做稳定闭环：

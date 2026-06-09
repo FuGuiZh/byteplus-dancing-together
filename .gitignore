@@ -1,6 +1,7 @@
 .env
 .env.local
 .env.*.local
+config/byteplus-dancing-together.local.json
 
 node_modules/
 dist/
@@ -8,3 +9,7 @@ build/
 .next/
 
 *.log
+tsconfig.tsbuildinfo
+
+.playwright-cli/
+output/playwright/

@@ -1,0 +1,20 @@
+{
+  "byteplus": {
+    "logPayloads": false,
+    "modelArkBaseUrl": "https://ark.ap-southeast.bytepluses.com/api/v3",
+    "openApiHost": "ark.ap-southeast-1.byteplusapi.com",
+    "openApiProtocol": "https"
+  },
+  "generation": {
+    "defaultRatio": "9:16",
+    "defaultDuration": 8,
+    "defaultResolution": "720p",
+    "defaultGenerateAudio": true,
+    "defaultUseFastEndpoint": false,
+    "defaultWatermark": false
+  },
+  "polling": {
+    "assetPollIntervalMs": 5000,
+    "videoTaskPollIntervalMs": 15000
+  }
+}
