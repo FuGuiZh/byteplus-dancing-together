@@ -46,6 +46,30 @@ export function getProviderError(response: unknown) {
   return { code, message };
 }
 
+function getProviderErrorStatus(code: string) {
+  if (code === "AccessDenied" || code === "Unauthorized") {
+    return 403;
+  }
+
+  if (code === "InvalidAccessKeyId" || code === "SignatureDoesNotMatch") {
+    return 401;
+  }
+
+  if (code === "Throttling" || code === "LimitExceeded") {
+    return 429;
+  }
+
+  if (
+    code === "InvalidParameter" ||
+    code.startsWith("InvalidParameter.") ||
+    code.startsWith("MissingParameter.")
+  ) {
+    return 400;
+  }
+
+  return 502;
+}
+
 export function requireProviderResult<T>(response: unknown): T {
   const providerError = getProviderError(response);
 
@@ -53,6 +77,7 @@ export function requireProviderResult<T>(response: unknown): T {
     throw new BytePlusServiceError({
       code: providerError.code,
       message: providerError.message,
+      status: getProviderErrorStatus(providerError.code),
       provider: response,
     });
   }

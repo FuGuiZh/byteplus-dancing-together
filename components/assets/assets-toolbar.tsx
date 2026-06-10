@@ -3,9 +3,11 @@
 import {
   FolderPlus,
   Grid2X2,
+  ImageUp,
   List,
   RefreshCcw,
   Search,
+  ShieldCheck,
   Trash2,
   Upload,
   Wand2,
@@ -40,10 +42,12 @@ export function AssetsToolbar({
   onCreateAsset,
   onCreateGroup,
   onDeleteSelection,
+  onPermissionCheck,
   onRefresh,
   onRenameSelection,
   onSearchChange,
   onStatusFilterChange,
+  onUploadImages,
   onViewModeChange,
   searchQuery,
   selected,
@@ -56,10 +60,12 @@ export function AssetsToolbar({
   onCreateAsset: () => void;
   onCreateGroup: () => void;
   onDeleteSelection: () => void;
+  onPermissionCheck: () => void;
   onRefresh: () => void;
   onRenameSelection: () => void;
   onSearchChange: (value: string) => void;
   onStatusFilterChange: (value: "all" | AssetStatus) => void;
+  onUploadImages: () => void;
   onViewModeChange: (value: AssetViewMode) => void;
   searchQuery: string;
   selected: boolean;
@@ -121,6 +127,15 @@ export function AssetsToolbar({
           <RefreshCcw className={cn("size-4", busy && "animate-spin")} />
           刷新
         </Button>
+        <Button
+          disabled={busy}
+          onClick={onPermissionCheck}
+          type="button"
+          variant="outline"
+        >
+          <ShieldCheck className="size-4" />
+          链路自检
+        </Button>
         <Button onClick={onCreateGroup} type="button" variant="outline">
           <FolderPlus className="size-4" />
           新建组
@@ -128,6 +143,10 @@ export function AssetsToolbar({
         <Button onClick={onCreateAsset} type="button">
           <Upload className="size-4" />
           URL 入库
+        </Button>
+        <Button onClick={onUploadImages} type="button" variant="outline">
+          <ImageUp className="size-4" />
+          图片入库
         </Button>
         <Button
           disabled={!selected}
@@ -150,34 +169,33 @@ export function AssetsToolbar({
       </div>
 
       <button
-        aria-label="切换资源显示方式"
-        className="relative flex h-10 w-[118px] shrink-0 items-center overflow-hidden rounded-full border-border bg-background p-1 text-xs font-bold [border-width:var(--ui-border-width)] [box-shadow:var(--ui-shadow-xs)]"
+        aria-label={viewMode === "grid" ? "切换为列表视图" : "切换为网格视图"}
+        className="relative flex h-10 w-[78px] shrink-0 items-center overflow-hidden rounded-full border-border bg-background p-1 text-xs font-bold [border-width:var(--ui-border-width)] [box-shadow:var(--ui-shadow-xs)]"
         onClick={() => onViewModeChange(viewMode === "grid" ? "list" : "grid")}
+        title={viewMode === "grid" ? "切换为列表视图" : "切换为网格视图"}
         type="button"
       >
         <span
           className={cn(
-            "absolute inset-y-1 w-[52px] rounded-full bg-primary transition-transform",
-            viewMode === "list" ? "translate-x-[56px]" : "translate-x-0"
+            "absolute inset-y-1 w-[32px] rounded-full bg-primary transition-transform",
+            viewMode === "list" ? "translate-x-[36px]" : "translate-x-0"
           )}
         />
         <span
           className={cn(
-            "relative z-10 flex w-1/2 items-center justify-center gap-1",
+            "relative z-10 flex w-1/2 items-center justify-center",
             viewMode === "grid" && "text-primary-foreground"
           )}
         >
-          <Grid2X2 className="size-3.5" />
-          网格
+          <Grid2X2 className="size-4" />
         </span>
         <span
           className={cn(
-            "relative z-10 flex w-1/2 items-center justify-center gap-1",
+            "relative z-10 flex w-1/2 items-center justify-center",
             viewMode === "list" && "text-primary-foreground"
           )}
         >
-          <List className="size-3.5" />
-          列表
+          <List className="size-4" />
         </span>
       </button>
     </div>

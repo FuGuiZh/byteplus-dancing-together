@@ -14,14 +14,20 @@ export function TextToVideoWorkspace() {
     <TextToVideoPageFrame
       composer={
         <VideoPromptComposer
+          assetLibraryError={session.assetLibraryError}
+          assetLibraryImages={session.assetLibraryImages}
           canSubmit={session.canSubmit}
           duration={session.duration}
           inputError={session.inputError}
           isBusy={session.isBusy}
+          isLoadingAssetLibraryImages={session.isLoadingAssetLibraryImages}
           isUploading={session.isUploading}
           modelMode={session.modelMode}
+          onAssetImageSelected={session.selectAssetImage}
           onImagesSelected={session.uploadImageFiles}
+          onLoadAssetLibraryImages={session.loadAssetLibraryImages}
           onRemoveImage={session.removeUploadedImage}
+          onRemoveSelectedAsset={session.removeSelectedAsset}
           onStop={session.stopCurrentTask}
           onSubmit={session.submitPrompt}
           prompt={session.prompt}
@@ -32,6 +38,7 @@ export function TextToVideoWorkspace() {
           setPrompt={session.setPrompt}
           setRatio={session.setRatio}
           setResolution={session.setResolution}
+          selectedAssets={session.selectedAssets}
           uploadedImages={session.uploadedImages}
         />
       }

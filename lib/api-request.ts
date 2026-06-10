@@ -61,6 +61,25 @@ function serializeError(error: unknown): unknown {
   };
 }
 
+function getBytePlusServiceErrorHint(error: BytePlusServiceError) {
+  if (error.code === "AccessDenied" || error.code === "Unauthorized") {
+    return [
+      "当前 IAM AK/SK 没有执行该 BytePlus Ark OpenAPI Action 的权限。",
+      "请确认 BYTEPLUS_PROJECT_NAME 与控制台项目一致，并为该 IAM 用户授予 ArkFullAccess 或覆盖素材库的 ark:*Asset* 权限。",
+      "如果是首次创建私域素材组，还需要先在 BytePlus 控制台完成对应授权书/能力开通。",
+    ];
+  }
+
+  if (error.code === "InvalidAccessKeyId" || error.code === "SignatureDoesNotMatch") {
+    return [
+      "当前 IAM AK/SK 无效或签名校验失败。",
+      "请检查 BYTEPLUS_IAM_ACCESS_KEY_ID、BYTEPLUS_IAM_SECRET_ACCESS_KEY、BYTEPLUS_REGION 是否对应同一个 BytePlus 账号和区域。",
+    ];
+  }
+
+  return undefined;
+}
+
 export function toErrorPayload(error: unknown) {
   if (error instanceof ZodError) {
     return {
@@ -77,6 +96,7 @@ export function toErrorPayload(error: unknown) {
     return {
       code: error.code,
       message: error.message,
+      hint: getBytePlusServiceErrorHint(error),
       provider: error.provider,
       server: serializeError(error),
     };

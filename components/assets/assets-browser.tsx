@@ -6,11 +6,17 @@ import {
   FileImage,
   FileVideo,
   Folder,
+  FolderPlus,
+  Grid2X2,
+  ImageUp,
   Info,
+  List as ListIcon,
   MoreHorizontal,
   Music,
+  RefreshCcw,
   Trash2,
   Wand2,
+  XCircle,
 } from "lucide-react";
 
 import type {
@@ -41,12 +47,18 @@ export function AssetsBrowser({
   assets,
   groups,
   loading,
+  onClearSelection,
+  onCreateAsset,
+  onCreateGroup,
   onDelete,
   onDetail,
   onOpenAsset,
   onRename,
+  onRefresh,
   onScopeChange,
   onSelect,
+  onUploadImages,
+  onViewModeChange,
   scope,
   selection,
   viewMode,
@@ -54,12 +66,18 @@ export function AssetsBrowser({
   assets: AssetItem[];
   groups: AssetGroupItem[];
   loading: boolean;
+  onClearSelection: () => void;
+  onCreateAsset: () => void;
+  onCreateGroup: () => void;
   onDelete: () => void;
   onDetail: () => void;
   onOpenAsset: (asset: AssetItem) => void;
   onRename: () => void;
+  onRefresh: () => void;
   onScopeChange: (scope: AssetScope) => void;
   onSelect: (selection: AssetSelection) => void;
+  onUploadImages: () => void;
+  onViewModeChange: (value: AssetViewMode) => void;
   scope: AssetScope;
   selection: AssetSelection;
   viewMode: AssetViewMode;
@@ -83,67 +101,147 @@ export function AssetsBrowser({
         {loading ? <Badge variant="warning">读取中</Badge> : null}
       </div>
 
-      <ScrollArea className="min-h-0 min-w-0 max-w-full overflow-hidden">
-        {isEmpty ? (
-          <div className="flex min-h-[420px] items-center justify-center p-8 text-center">
-            <div>
-              <div className="mx-auto flex size-14 items-center justify-center rounded-[var(--ui-radius)] bg-secondary text-secondary-foreground">
-                <Folder className="size-7" />
-              </div>
-              <div className="mt-4 text-base font-bold">还没有可展示的素材资源</div>
-              <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-                可以先创建 AIGC 素材组，再用 BytePlus 可访问的 URL 入库图片、视频或音频素材。
-              </p>
-            </div>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div className="min-h-0 min-w-0 max-w-full overflow-hidden">
+            <ScrollArea className="h-full min-h-0 min-w-0 max-w-full overflow-hidden">
+              {isEmpty ? (
+                <div className="flex min-h-[420px] items-center justify-center p-8 text-center">
+                  <div>
+                    <div className="mx-auto flex size-14 items-center justify-center rounded-[var(--ui-radius)] bg-secondary text-secondary-foreground">
+                      <Folder className="size-7" />
+                    </div>
+                    <div className="mt-4 text-base font-bold">
+                      还没有可展示的素材资源
+                    </div>
+                    <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                      可以先创建 AIGC 素材组，再用 BytePlus 可访问的 URL
+                      或本地图片文件入库素材。
+                    </p>
+                  </div>
+                </div>
+              ) : viewMode === "grid" ? (
+                <div className="grid min-w-0 max-w-full grid-cols-[repeat(auto-fill,minmax(min(150px,100%),1fr))] gap-x-6 gap-y-7 p-7">
+                  {showGroups
+                    ? groups.map((group) => (
+                        <AssetGroupTile
+                          group={group}
+                          key={group.id}
+                          onDelete={onDelete}
+                          onDetail={onDetail}
+                          onOpen={() =>
+                            onScopeChange({ type: "group", groupId: group.id })
+                          }
+                          onRename={onRename}
+                          onSelect={() =>
+                            onSelect({ type: "group", id: group.id })
+                          }
+                          selected={
+                            selection?.type === "group" &&
+                            selection.id === group.id
+                          }
+                        />
+                      ))
+                    : null}
+                  {assets.map((asset) => (
+                    <AssetTile
+                      asset={asset}
+                      key={asset.id}
+                      onDelete={onDelete}
+                      onDetail={onDetail}
+                      onOpen={() => onOpenAsset(asset)}
+                      onRename={onRename}
+                      onSelect={() => onSelect({ type: "asset", id: asset.id })}
+                      selected={
+                        selection?.type === "asset" && selection.id === asset.id
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <AssetsListView
+                  assets={assets}
+                  groups={showGroups ? groups : []}
+                  onDelete={onDelete}
+                  onDetail={onDetail}
+                  onOpenAsset={onOpenAsset}
+                  onRename={onRename}
+                  onScopeChange={onScopeChange}
+                  onSelect={onSelect}
+                  selection={selection}
+                />
+              )}
+            </ScrollArea>
           </div>
-        ) : viewMode === "grid" ? (
-          <div className="grid min-w-0 max-w-full grid-cols-[repeat(auto-fill,minmax(min(150px,100%),1fr))] gap-x-6 gap-y-7 p-7">
-            {showGroups
-              ? groups.map((group) => (
-                  <AssetGroupTile
-                    group={group}
-                    key={group.id}
-                    onDelete={onDelete}
-                    onDetail={onDetail}
-                    onOpen={() =>
-                      onScopeChange({ type: "group", groupId: group.id })
-                    }
-                    onRename={onRename}
-                    onSelect={() => onSelect({ type: "group", id: group.id })}
-                    selected={
-                      selection?.type === "group" && selection.id === group.id
-                    }
-                  />
-                ))
-              : null}
-            {assets.map((asset) => (
-              <AssetTile
-                asset={asset}
-                key={asset.id}
-                onDelete={onDelete}
-                onDetail={onDetail}
-                onOpen={() => onOpenAsset(asset)}
-                onRename={onRename}
-                onSelect={() => onSelect({ type: "asset", id: asset.id })}
-                selected={selection?.type === "asset" && selection.id === asset.id}
-              />
-            ))}
-          </div>
-        ) : (
-          <AssetsListView
-            assets={assets}
-            groups={showGroups ? groups : []}
-            onDelete={onDelete}
-            onDetail={onDetail}
-            onOpenAsset={onOpenAsset}
-            onRename={onRename}
-            onScopeChange={onScopeChange}
-            onSelect={onSelect}
-            selection={selection}
-          />
-        )}
-      </ScrollArea>
+        </ContextMenuTrigger>
+        <BrowserContextMenu
+          hasSelection={Boolean(selection)}
+          onClearSelection={onClearSelection}
+          onCreateAsset={onCreateAsset}
+          onCreateGroup={onCreateGroup}
+          onRefresh={onRefresh}
+          onToggleViewMode={() =>
+            onViewModeChange(viewMode === "grid" ? "list" : "grid")
+          }
+          onUploadImages={onUploadImages}
+          viewMode={viewMode}
+        />
+      </ContextMenu>
     </div>
+  );
+}
+
+function BrowserContextMenu({
+  hasSelection,
+  onClearSelection,
+  onCreateAsset,
+  onCreateGroup,
+  onRefresh,
+  onToggleViewMode,
+  onUploadImages,
+  viewMode,
+}: {
+  hasSelection: boolean;
+  onClearSelection: () => void;
+  onCreateAsset: () => void;
+  onCreateGroup: () => void;
+  onRefresh: () => void;
+  onToggleViewMode: () => void;
+  onUploadImages: () => void;
+  viewMode: AssetViewMode;
+}) {
+  return (
+    <ContextMenuContent className="w-56">
+      <ContextMenuItem onClick={onUploadImages}>
+        <ImageUp className="size-4" />
+        图片文件入库
+      </ContextMenuItem>
+      <ContextMenuItem onClick={onCreateAsset}>
+        <ExternalLink className="size-4" />
+        提交 URL 入库
+      </ContextMenuItem>
+      <ContextMenuItem onClick={onCreateGroup}>
+        <FolderPlus className="size-4" />
+        新建 AIGC 素材组
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem onClick={onRefresh}>
+        <RefreshCcw className="size-4" />
+        刷新素材库
+      </ContextMenuItem>
+      <ContextMenuItem onClick={onToggleViewMode}>
+        {viewMode === "grid" ? (
+          <ListIcon className="size-4" />
+        ) : (
+          <Grid2X2 className="size-4" />
+        )}
+        {viewMode === "grid" ? "切换为列表" : "切换为网格"}
+      </ContextMenuItem>
+      <ContextMenuItem disabled={!hasSelection} onClick={onClearSelection}>
+        <XCircle className="size-4" />
+        清除选择
+      </ContextMenuItem>
+    </ContextMenuContent>
   );
 }
 

@@ -4,7 +4,10 @@ import Image from "next/image";
 import * as React from "react";
 import {
   Activity,
+  Check,
   ImagePlus,
+  Images,
+  RefreshCw,
   Send,
   Square,
   X,
@@ -35,17 +38,26 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { UploadedImage } from "@/components/text-to-video/types";
+import type {
+  SelectedGenerationAsset,
+  UploadedImage,
+} from "@/components/text-to-video/types";
 
 type VideoPromptComposerProps = {
+  assetLibraryError: string | null;
+  assetLibraryImages: SelectedGenerationAsset[];
   canSubmit: boolean;
   duration: VideoDuration;
   inputError: string | null;
   isBusy: boolean;
+  isLoadingAssetLibraryImages: boolean;
   isUploading: boolean;
   modelMode: VideoModelMode;
+  onAssetImageSelected: (asset: SelectedGenerationAsset) => void;
   onImagesSelected: (files: File[]) => void;
+  onLoadAssetLibraryImages: () => Promise<void>;
   onRemoveImage: (imageId: string) => void;
+  onRemoveSelectedAsset: (assetId: string) => void;
   onStop: () => void;
   onSubmit: () => void;
   prompt: string;
@@ -56,18 +68,25 @@ type VideoPromptComposerProps = {
   setPrompt: (value: string) => void;
   setRatio: (value: VideoRatio) => void;
   setResolution: (value: VideoResolution) => void;
+  selectedAssets: SelectedGenerationAsset[];
   uploadedImages: UploadedImage[];
 };
 
 export function VideoPromptComposer({
+  assetLibraryError,
+  assetLibraryImages,
   canSubmit,
   duration,
   inputError,
   isBusy,
+  isLoadingAssetLibraryImages,
   isUploading,
   modelMode,
+  onAssetImageSelected,
   onImagesSelected,
+  onLoadAssetLibraryImages,
   onRemoveImage,
+  onRemoveSelectedAsset,
   onStop,
   onSubmit,
   prompt,
@@ -78,9 +97,16 @@ export function VideoPromptComposer({
   setPrompt,
   setRatio,
   setResolution,
+  selectedAssets,
   uploadedImages,
 }: VideoPromptComposerProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [assetPickerOpen, setAssetPickerOpen] = React.useState(false);
+
+  const selectedAssetIds = React.useMemo(
+    () => new Set(selectedAssets.map((asset) => asset.id)),
+    [selectedAssets]
+  );
 
   function handlePaste(event: React.ClipboardEvent<HTMLFormElement>) {
     if (isBusy || isUploading) {
@@ -117,6 +143,18 @@ export function VideoPromptComposer({
     }
   }
 
+  function toggleAssetPicker() {
+    setAssetPickerOpen((current) => {
+      const nextOpen = !current;
+
+      if (nextOpen && assetLibraryImages.length === 0) {
+        void onLoadAssetLibraryImages();
+      }
+
+      return nextOpen;
+    });
+  }
+
   return (
     <form
       className="mx-auto w-full min-w-0 max-w-4xl rounded-[calc(var(--ui-radius)*1.8)] border-border bg-card p-3 [border-width:var(--ui-border-width)] [box-shadow:0_14px_40px_color-mix(in_oklch,var(--ring)_14%,transparent)]"
@@ -135,7 +173,7 @@ export function VideoPromptComposer({
         视频生成提示词
       </label>
 
-      {uploadedImages.length > 0 ? (
+      {uploadedImages.length > 0 || selectedAssets.length > 0 ? (
         <div className="mb-3 flex min-w-0 flex-wrap gap-2">
           {uploadedImages.map((image) => (
             <div
@@ -164,6 +202,45 @@ export function VideoPromptComposer({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>移除图片</TooltipContent>
+              </Tooltip>
+            </div>
+          ))}
+          {selectedAssets.map((asset) => (
+            <div
+              className="group/image relative flex size-24 min-w-0 flex-col overflow-hidden rounded-[calc(var(--ui-radius)*1.1)] bg-muted"
+              key={asset.id}
+            >
+              {asset.url ? (
+                <Image
+                  alt={asset.name}
+                  className="min-h-0 flex-1 object-cover"
+                  height={96}
+                  src={asset.url}
+                  unoptimized
+                  width={96}
+                />
+              ) : (
+                <div className="grid min-h-0 flex-1 place-items-center">
+                  <Images className="size-5 text-muted-foreground" />
+                </div>
+              )}
+              <div className="truncate bg-background/90 px-1.5 py-1 text-[10px] leading-none text-foreground">
+                素材库
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label={`移除素材 ${asset.name}`}
+                    className="absolute right-1.5 top-1.5 hidden size-6 rounded-full bg-background/90 p-0 text-foreground shadow-sm backdrop-blur hover:bg-background group-hover/image:inline-flex focus:inline-flex"
+                    onClick={() => onRemoveSelectedAsset(asset.id)}
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>移除素材引用</TooltipContent>
               </Tooltip>
             </div>
           ))}
@@ -208,7 +285,102 @@ export function VideoPromptComposer({
         </Button>
       </div>
 
-      <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
+      {assetPickerOpen ? (
+        <div className="mt-3 rounded-[calc(var(--ui-radius)*1.2)] border-border bg-background p-3 [border-width:var(--ui-border-width)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">素材库图片</div>
+              <div className="truncate text-xs text-muted-foreground">
+                仅显示 AIGC / LivenessFace 中状态为 Active 的图片；生成时会传
+                asset://AssetId。
+              </div>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  aria-label="刷新素材库图片"
+                  className="size-8 shrink-0 rounded-full p-0"
+                  disabled={isLoadingAssetLibraryImages}
+                  onClick={() => void onLoadAssetLibraryImages()}
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "size-4",
+                      isLoadingAssetLibraryImages && "animate-spin"
+                    )}
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>刷新素材库图片</TooltipContent>
+            </Tooltip>
+          </div>
+          {assetLibraryError ? (
+            <div className="mb-3 rounded-[calc(var(--ui-radius)*0.9)] bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {assetLibraryError}
+            </div>
+          ) : null}
+          <div className="grid max-h-64 min-w-0 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+            {assetLibraryImages.map((asset) => {
+              const selected = selectedAssetIds.has(asset.id);
+
+              return (
+                <button
+                  className={cn(
+                    "flex min-w-0 items-center gap-3 rounded-[calc(var(--ui-radius)*1.1)] border-border bg-card p-2 text-left [border-width:var(--ui-border-width)] hover:bg-muted",
+                    selected && "bg-muted"
+                  )}
+                  disabled={selected}
+                  key={asset.id}
+                  onClick={() => onAssetImageSelected(asset)}
+                  type="button"
+                >
+                  <div className="relative size-12 shrink-0 overflow-hidden rounded-[calc(var(--ui-radius)*0.8)] bg-muted">
+                    {asset.url ? (
+                      <Image
+                        alt={asset.name}
+                        className="size-full object-cover"
+                        height={48}
+                        src={asset.url}
+                        unoptimized
+                        width={48}
+                      />
+                    ) : (
+                      <div className="grid size-full place-items-center">
+                        <Images className="size-4 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">
+                      {asset.name}
+                    </div>
+                    <div className="truncate font-mono text-[11px] text-muted-foreground">
+                      {asset.id}
+                    </div>
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {asset.groupType || "AIGC"}
+                    </div>
+                  </div>
+                  {selected ? (
+                    <Check className="size-4 shrink-0 text-success" />
+                  ) : null}
+                </button>
+              );
+            })}
+            {!isLoadingAssetLibraryImages && assetLibraryImages.length === 0 ? (
+              <div className="col-span-full rounded-[calc(var(--ui-radius)*0.9)] bg-muted px-3 py-4 text-sm text-muted-foreground">
+                还没有可用图片素材。请先在素材库把图片入库，并等状态变为
+                Active。
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,0.75fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -226,6 +398,27 @@ export function VideoPromptComposer({
             </Button>
           </TooltipTrigger>
           <TooltipContent>上传参考图片</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className={cn(
+                "h-9 rounded-full shadow-none",
+                assetPickerOpen && "bg-muted"
+              )}
+              disabled={isBusy}
+              onClick={toggleAssetPicker}
+              type="button"
+              variant="outline"
+            >
+              {isLoadingAssetLibraryImages ? (
+                <Activity className="size-4 animate-pulse" />
+              ) : (
+                <Images className="size-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>从素材库选择图片</TooltipContent>
         </Tooltip>
         <SelectPill
           ariaLabel="选择画幅"

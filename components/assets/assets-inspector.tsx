@@ -5,6 +5,7 @@ import {
   ExternalLink,
   FileInput,
   FolderPlus,
+  ImageUp,
   Info,
   Link2,
   Trash2,
@@ -65,6 +66,7 @@ export function AssetsInspector({
   onDeleteSelection,
   onFetchDetail,
   onGroupFormChange,
+  onUploadImages,
   onOpenAsset,
   onRenameSelection,
   selectedAsset,
@@ -81,6 +83,7 @@ export function AssetsInspector({
   onDeleteSelection: () => void;
   onFetchDetail: () => void;
   onGroupFormChange: (next: AssetGroupFormState) => void;
+  onUploadImages: () => void;
   onOpenAsset: (asset: AssetItem) => void;
   onRenameSelection: () => void;
   selectedAsset: AssetItem | null;
@@ -141,6 +144,62 @@ export function AssetsInspector({
               </Button>
             </div>
           ) : null}
+        </section>
+
+        <section className="min-w-0 max-w-full overflow-hidden rounded-[var(--ui-radius)] border-border bg-card p-4 [border-width:var(--ui-border-width)]">
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold">
+            <ImageUp className="size-4" />
+            本地图片入库
+          </div>
+          <div className="grid gap-3">
+            <Select
+              onValueChange={(value) =>
+                onAssetFormChange({ ...assetForm, groupId: value })
+              }
+              value={assetForm.groupId}
+            >
+              <SelectTrigger className="w-full min-w-0 max-w-full">
+                <SelectValue placeholder="选择素材组" />
+              </SelectTrigger>
+              <SelectContent>
+                {groups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              onValueChange={(value) =>
+                onAssetFormChange({
+                  ...assetForm,
+                  moderationStrategy: value as "Default" | "Skip",
+                })
+              }
+              value={assetForm.moderationStrategy}
+            >
+              <SelectTrigger className="w-full min-w-0 max-w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Default">默认审核</SelectItem>
+                <SelectItem value="Skip">跳过审核</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              disabled={busy || (!assetForm.groupId && !selectedGroup)}
+              onClick={onUploadImages}
+              type="button"
+              variant="outline"
+            >
+              <ImageUp className="size-4" />
+              选择图片并提交
+            </Button>
+            <p className="break-words text-xs leading-5 text-muted-foreground">
+              文件会先保存到本地用户目录，再通过 APP_PUBLIC_URL 暴露给 BytePlus
+              拉取并执行 CreateAsset；localhost 地址通常不能被公网服务访问。
+            </p>
+          </div>
         </section>
 
         <section className="min-w-0 max-w-full overflow-hidden rounded-[var(--ui-radius)] border-border bg-card p-4 [border-width:var(--ui-border-width)]">

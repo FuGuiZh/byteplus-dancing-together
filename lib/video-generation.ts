@@ -84,13 +84,14 @@ export const videoResolutionOptions: Array<{
 
 export const textToVideoEmptyPrompts = [
   "试试用 Seedance 2.0 生成个视频吧？",
-  "输入一个画面，Seedance 2.0 会把它变成视频。",
+  "Ctrl+V 粘贴剪切板的图片，Seedance 2.0 会把它变成视频。",
   "从一句话开始，比如：生成一只小猫喝水。",
+  "图片被拒绝？不要慌，换成没有真实人脸的图片。",
+  "上传一张参考图？让 Seedance 2.0 动起来。",
   "描述主体、场景、动作和镜头，视频会更稳定。",
   "想要短视频感？可以写清楚节奏、光线和运镜。",
-  "也可以上传一张参考图，再让 Seedance 2.0 动起来。",
-  "试试：雨夜街头，一位舞者在霓虹灯下转身。",
-  "试试：阳光厨房里，一只小狗跑向水碗。",
+  "上传一张图片后试试：雨夜街头，一位舞者在霓虹灯下转身。",
+  "你有没有注意到，停留时间是根据字数长度变化的呢？",
 ];
 
 export const videoTaskStatusCopy: Record<

@@ -42,6 +42,16 @@ export type UploadedImage = {
   dataUrl: string;
 };
 
+export type SelectedGenerationAsset = {
+  id: string;
+  name: string;
+  url: string;
+  groupId: string;
+  groupType: string;
+  assetKind: "Image" | "Video" | "Audio";
+  status: string;
+};
+
 export type ConversationMessage =
   | {
       id: string;
@@ -50,6 +60,7 @@ export type ConversationMessage =
       imageName?: string;
       imageDataUrl?: string;
       imagePreviews?: UploadedImage[];
+      assetPreviews?: SelectedGenerationAsset[];
     }
   | {
       id: string;

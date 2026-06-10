@@ -48,6 +48,12 @@ const navItems = [
     icon: Film,
   },
   {
+    href: "/asset-library",
+    label: "素材库",
+    description: "私域素材入库与审核状态",
+    icon: Library,
+  },
+  {
     href: "/real-person",
     label: "真人认证",
     description: "H5 活体认证流程",
@@ -64,12 +70,6 @@ const navItems = [
     label: "控制台",
     description: "认证、素材组与任务 API",
     icon: Code2,
-  },
-  {
-    href: "/assets",
-    label: "素材",
-    description: "素材入库与状态",
-    icon: Library,
   },
 ];
 

@@ -47,7 +47,12 @@ const defaultAssetForm: AssetCreateFormState = {
   moderationStrategy: "Default",
 };
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "请求失败。";
+}
+
 export function AssetsWorkspace() {
+  const imageUploadInputRef = React.useRef<HTMLInputElement>(null);
   const [groups, setGroups] = React.useState<AssetGroupItem[]>([]);
   const [assets, setAssets] = React.useState<AssetItem[]>([]);
   const [scope, setScope] = React.useState<AssetScope>({ type: "root" });
@@ -58,7 +63,7 @@ export function AssetsWorkspace() {
   const [assetKindFilter, setAssetKindFilter] =
     React.useState<"all" | AssetKind>("all");
   const [viewMode, setViewMode] = React.useState<AssetViewMode>("grid");
-  const [busy, setBusy] = React.useState(false);
+  const [pendingRequestCount, setPendingRequestCount] = React.useState(0);
   const [apiSnapshot, setApiSnapshot] = React.useState<ApiSnapshot | null>(null);
   const [groupForm, setGroupForm] =
     React.useState<AssetGroupFormState>(defaultGroupForm);
@@ -95,6 +100,7 @@ export function AssetsWorkspace() {
         : null,
     [assets, selection]
   );
+  const busy = pendingRequestCount > 0;
 
   const requestJson = React.useCallback(
     async <T,>(
@@ -106,7 +112,7 @@ export function AssetsWorkspace() {
       const method = options.method ?? "GET";
       const startedAt = performance.now();
       let snapshotWritten = false;
-      setBusy(true);
+      setPendingRequestCount((current) => current + 1);
 
       try {
         const response = await fetch(path, {
@@ -137,8 +143,7 @@ export function AssetsWorkspace() {
 
         return payload;
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : `${label}失败。`;
+        const message = getErrorMessage(error);
         if (!snapshotWritten) {
           setApiSnapshot({
             label,
@@ -151,7 +156,7 @@ export function AssetsWorkspace() {
         }
         throw error;
       } finally {
-        setBusy(false);
+        setPendingRequestCount((current) => Math.max(0, current - 1));
       }
     },
     []
@@ -159,6 +164,7 @@ export function AssetsWorkspace() {
 
   const loadGroups = React.useCallback(async () => {
     const params = new URLSearchParams({
+      group_type: "AIGC",
       page_size: String(ASSET_LIST_PAGE_SIZE),
       sort_by: "UpdateTime",
       sort_order: "Desc",
@@ -183,11 +189,12 @@ export function AssetsWorkspace() {
         groupId: writableGroup?.id ?? "",
       };
     });
-    return nextGroups;
+    return { items: nextGroups, raw: payload };
   }, [requestJson]);
 
   const loadAssets = React.useCallback(async () => {
     const params = new URLSearchParams({
+      group_type: "AIGC",
       page_size: String(ASSET_LIST_PAGE_SIZE),
       sort_by: "UpdateTime",
       sort_order: "Desc",
@@ -198,14 +205,59 @@ export function AssetsWorkspace() {
     );
     const nextAssets = normalizeAssets(payload);
     setAssets(nextAssets);
-    return nextAssets;
+    return { items: nextAssets, raw: payload };
   }, [requestJson]);
 
   const refreshAll = React.useCallback(async () => {
-    try {
-      await Promise.all([loadGroups(), loadAssets()]);
-    } catch {
-      // API 原始错误已经写入 apiSnapshot；这里不额外吞吐 UI 状态。
+    const startedAt = performance.now();
+    const [groupResult, assetResult] = await Promise.allSettled([
+      loadGroups(),
+      loadAssets(),
+    ]);
+    const hasError =
+      groupResult.status === "rejected" || assetResult.status === "rejected";
+
+    setApiSnapshot({
+      error: hasError
+        ? "素材组和素材列表已分别请求；部分接口失败时，可用数据仍会展示。"
+        : undefined,
+      elapsedMs: Math.round(performance.now() - startedAt),
+      label: "刷新素材库",
+      method: "GET",
+      path: "/api/byteplus/asset-groups + /api/byteplus/assets",
+      request: {
+        note: "ProjectName 由服务端 BYTEPLUS_PROJECT_NAME 决定；当前未在前端开放任意 ProjectName。",
+        pageSize: ASSET_LIST_PAGE_SIZE,
+      },
+      response: {
+        assetGroups:
+          groupResult.status === "fulfilled"
+            ? {
+                count: groupResult.value.items.length,
+                ok: true,
+                raw: groupResult.value.raw,
+              }
+            : {
+                error: getErrorMessage(groupResult.reason),
+                ok: false,
+              },
+        assets:
+          assetResult.status === "fulfilled"
+            ? {
+                count: assetResult.value.items.length,
+                ok: true,
+                raw: assetResult.value.raw,
+              }
+            : {
+                error: getErrorMessage(assetResult.reason),
+                ok: false,
+              },
+      },
+      status: hasError ? 207 : 200,
+    });
+
+    if (groupResult.status === "rejected" && assetResult.status === "rejected") {
+      return;
     }
   }, [loadAssets, loadGroups]);
 
@@ -217,6 +269,108 @@ export function AssetsWorkspace() {
   function handleScopeChange(nextScope: AssetScope) {
     setScope(nextScope);
     setSelection(null);
+    if (nextScope.type === "group") {
+      setAssetForm((current) => ({ ...current, groupId: nextScope.groupId }));
+    }
+  }
+
+  function getActiveUploadGroupId() {
+    if (assetForm.groupId) {
+      return assetForm.groupId;
+    }
+
+    if (selectedGroup?.id) {
+      return selectedGroup.id;
+    }
+
+    if (scope.type === "group") {
+      return scope.groupId;
+    }
+
+    return (
+      groups.find((group) => group.groupType === "AIGC")?.id ??
+      groups[0]?.id ??
+      ""
+    );
+  }
+
+  function openImageUploadPicker() {
+    const groupId = getActiveUploadGroupId();
+
+    if (!groupId) {
+      setApiSnapshot({
+        label: "图片文件入库",
+        method: "POST",
+        path: "/api/byteplus/assets/file-upload",
+        error: "请先刷新或创建一个素材组，再上传图片素材。",
+      });
+      return;
+    }
+
+    setAssetForm((current) => ({ ...current, groupId }));
+    imageUploadInputRef.current?.click();
+  }
+
+  async function uploadImageFiles(files: File[]) {
+    const groupId = getActiveUploadGroupId();
+
+    if (!groupId) {
+      setApiSnapshot({
+        label: "图片文件入库",
+        method: "POST",
+        path: "/api/byteplus/assets/file-upload",
+        error: "请先刷新或创建一个素材组，再上传图片素材。",
+      });
+      return;
+    }
+
+    if (files.length === 0) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("groupId", groupId);
+    formData.set("moderationStrategy", assetForm.moderationStrategy);
+    if (files.length === 1 && assetForm.name.trim()) {
+      formData.set("name", assetForm.name.trim());
+    }
+
+    for (const file of files) {
+      formData.append("files", file);
+    }
+
+    const requestBody = {
+      groupId,
+      moderationStrategy: assetForm.moderationStrategy,
+      files: files.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      })),
+    };
+
+    try {
+      await requestJson(
+        "图片文件入库",
+        "/api/byteplus/assets/file-upload",
+        {
+          body: formData,
+          method: "POST",
+        },
+        requestBody
+      );
+      await loadAssets();
+    } catch {
+      // 详情在 API 面板。
+    }
+  }
+
+  function handleImageUploadInputChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    void uploadImageFiles(files);
   }
 
   async function createGroup() {
@@ -279,6 +433,22 @@ export function AssetsWorkspace() {
       await loadAssets();
     } catch {
       // 详情在 API 面板。
+    }
+  }
+
+  async function runPermissionCheck() {
+    const requestBody = {
+      includeWriteChecks: true,
+    };
+
+    try {
+      await requestJson("权限链路自检", "/api/byteplus/permission-check", {
+        body: JSON.stringify(requestBody),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      }, requestBody);
+    } catch {
+      // 分步结果和原始响应已经写入 API 面板。
     }
   }
 
@@ -456,78 +626,97 @@ export function AssetsWorkspace() {
   }
 
   return (
-    <AssetsFrame
-      browser={
-        <AssetsBrowser
-          assets={visibleAssets}
-          groups={visibleGroups}
-          loading={busy}
-          onDelete={deleteSelection}
-          onDetail={fetchSelectionDetail}
-          onOpenAsset={openAsset}
-          onRename={renameSelection}
-          onScopeChange={handleScopeChange}
-          onSelect={setSelection}
-          scope={scope}
-          selection={selection}
-          viewMode={viewMode}
-        />
-      }
-      inspector={
-        <AssetsInspector
-          apiSnapshot={apiSnapshot}
-          assetForm={assetForm}
-          busy={busy}
-          groupForm={groupForm}
-          groups={groups}
-          onAssetFormChange={setAssetForm}
-          onCreateAsset={createAsset}
-          onCreateGroup={createGroup}
-          onDeleteSelection={deleteSelection}
-          onFetchDetail={fetchSelectionDetail}
-          onGroupFormChange={setGroupForm}
-          onOpenAsset={openAsset}
-          onRenameSelection={renameSelection}
-          selectedAsset={selectedAsset}
-          selectedGroup={selectedGroup}
-        />
-      }
-      sidebar={
-        <AssetsTree
-          counts={counts}
-          groups={groups}
-          onScopeChange={handleScopeChange}
-          scope={scope}
-        />
-      }
-      statusBar={
-        <AssetsStatusBar
-          apiSnapshot={apiSnapshot}
-          busy={busy}
-          counts={counts}
-          visibleAssetCount={visibleAssets.length}
-          visibleGroupCount={visibleGroups.length}
-        />
-      }
-      toolbar={
-        <AssetsToolbar
-          assetKindFilter={assetKindFilter}
-          busy={busy}
-          onAssetKindFilterChange={setAssetKindFilter}
-          onCreateAsset={createAsset}
-          onCreateGroup={createGroup}
-          onDeleteSelection={deleteSelection}
-          onRefresh={() => void refreshAll()}
-          onRenameSelection={renameSelection}
-          onSearchChange={setSearchQuery}
-          onStatusFilterChange={setStatusFilter}
-          onViewModeChange={setViewMode}
-          searchQuery={searchQuery}
-          selected={Boolean(selection)}
-          statusFilter={statusFilter}
-          viewMode={viewMode}
-        />
-      }
-    />
+    <>
+      <input
+        accept="image/*"
+        className="hidden"
+        multiple
+        onChange={handleImageUploadInputChange}
+        ref={imageUploadInputRef}
+        type="file"
+      />
+      <AssetsFrame
+        browser={
+          <AssetsBrowser
+            assets={visibleAssets}
+            groups={visibleGroups}
+            loading={busy}
+            onClearSelection={() => setSelection(null)}
+            onCreateAsset={createAsset}
+            onCreateGroup={createGroup}
+            onDelete={deleteSelection}
+            onDetail={fetchSelectionDetail}
+            onOpenAsset={openAsset}
+            onRefresh={() => void refreshAll()}
+            onRename={renameSelection}
+            onScopeChange={handleScopeChange}
+            onSelect={setSelection}
+            onUploadImages={openImageUploadPicker}
+            onViewModeChange={setViewMode}
+            scope={scope}
+            selection={selection}
+            viewMode={viewMode}
+          />
+        }
+        inspector={
+          <AssetsInspector
+            apiSnapshot={apiSnapshot}
+            assetForm={assetForm}
+            busy={busy}
+            groupForm={groupForm}
+            groups={groups}
+            onAssetFormChange={setAssetForm}
+            onCreateAsset={createAsset}
+            onCreateGroup={createGroup}
+            onDeleteSelection={deleteSelection}
+            onFetchDetail={fetchSelectionDetail}
+            onGroupFormChange={setGroupForm}
+            onOpenAsset={openAsset}
+            onRenameSelection={renameSelection}
+            onUploadImages={openImageUploadPicker}
+            selectedAsset={selectedAsset}
+            selectedGroup={selectedGroup}
+          />
+        }
+        sidebar={
+          <AssetsTree
+            counts={counts}
+            groups={groups}
+            onScopeChange={handleScopeChange}
+            scope={scope}
+          />
+        }
+        statusBar={
+          <AssetsStatusBar
+            apiSnapshot={apiSnapshot}
+            busy={busy}
+            counts={counts}
+            visibleAssetCount={visibleAssets.length}
+            visibleGroupCount={visibleGroups.length}
+          />
+        }
+        toolbar={
+          <AssetsToolbar
+            assetKindFilter={assetKindFilter}
+            busy={busy}
+            onAssetKindFilterChange={setAssetKindFilter}
+            onCreateAsset={createAsset}
+            onCreateGroup={createGroup}
+            onDeleteSelection={deleteSelection}
+            onPermissionCheck={() => void runPermissionCheck()}
+            onRefresh={() => void refreshAll()}
+            onRenameSelection={renameSelection}
+            onSearchChange={setSearchQuery}
+            onStatusFilterChange={setStatusFilter}
+            onUploadImages={openImageUploadPicker}
+            onViewModeChange={setViewMode}
+            searchQuery={searchQuery}
+            selected={Boolean(selection)}
+            statusFilter={statusFilter}
+            viewMode={viewMode}
+          />
+        }
+      />
+    </>
   );
 }

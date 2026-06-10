@@ -8,6 +8,7 @@ import {
 } from "@/lib/video-generation";
 import type {
   ConversationMessage,
+  SelectedGenerationAsset,
   UploadedImage,
 } from "@/components/text-to-video/types";
 import { ResultVideoCard } from "@/components/text-to-video/result-video-card";
@@ -34,6 +35,22 @@ type ConversationTurn =
     };
 
 type ActivityOutcome = "loading" | "success" | "failed" | "neutral";
+
+const EMPTY_PROMPT_BASE_DISPLAY_MS = 1500;
+const EMPTY_PROMPT_UNIT_DISPLAY_MS = 150;
+
+function getEmptyPromptDisplayDurationMs(prompt: string) {
+  let unitCount = 0;
+  const tokenMatches = prompt.matchAll(/[A-Za-z]+|[^\s]/gu);
+
+  for (const match of tokenMatches) {
+    unitCount += /^[A-Za-z]+$/.test(match[0]) ? 3 : 1;
+  }
+
+  return (
+    EMPTY_PROMPT_BASE_DISPLAY_MS + unitCount * EMPTY_PROMPT_UNIT_DISPLAY_MS
+  );
+}
 
 export function ConversationTimeline({
   messages,
@@ -92,15 +109,15 @@ function EmptyPromptCarousel() {
       return;
     }
 
-    const intervalId = window.setInterval(() => {
+    const timeoutId = window.setTimeout(() => {
       setActiveIndex((current) => {
         setPreviousIndex(current);
         return (current + 1) % textToVideoEmptyPrompts.length;
       });
-    }, 4000);
+    }, getEmptyPromptDisplayDurationMs(textToVideoEmptyPrompts[activeIndex]));
 
-    return () => window.clearInterval(intervalId);
-  }, []);
+    return () => window.clearTimeout(timeoutId);
+  }, [activeIndex]);
 
   return (
     <div className="grid min-h-[calc(100dvh-260px)] flex-1 place-items-center px-6 text-center">
@@ -128,6 +145,7 @@ function EmptyPromptCarousel() {
 function ConversationTurnItem({ turn }: { turn: ConversationTurn }) {
   if (turn.type === "user") {
     const images = getUserMessageImages(turn.message);
+    const assets = turn.message.assetPreviews ?? [];
 
     return (
       <div className="flex justify-end">
@@ -144,6 +162,13 @@ function ConversationTurnItem({ turn }: { turn: ConversationTurn }) {
                   unoptimized
                   width={96}
                 />
+              ))}
+            </div>
+          ) : null}
+          {assets.length > 0 ? (
+            <div className="flex max-w-full flex-wrap justify-end gap-2">
+              {assets.map((asset) => (
+                <AssetPreviewTile asset={asset} key={asset.id} />
               ))}
             </div>
           ) : null}
@@ -167,6 +192,36 @@ function ConversationTurnItem({ turn }: { turn: ConversationTurn }) {
         ))}
       </div>
     </AssistantTurnShell>
+  );
+}
+
+function AssetPreviewTile({ asset }: { asset: SelectedGenerationAsset }) {
+  return (
+    <div className="w-32 overflow-hidden rounded-[calc(var(--ui-radius)*1.1)] bg-muted text-left">
+      {asset.url ? (
+        <Image
+          alt={asset.name}
+          className="h-24 w-full object-cover"
+          height={96}
+          src={asset.url}
+          unoptimized
+          width={128}
+        />
+      ) : (
+        <div className="grid h-24 place-items-center text-xs text-muted-foreground">
+          素材库图片
+        </div>
+      )}
+      <div className="space-y-0.5 px-2 py-1.5">
+        <div className="truncate text-xs font-medium">{asset.name}</div>
+        <div className="truncate font-mono text-[10px] text-muted-foreground">
+          {asset.id}
+        </div>
+        <div className="truncate text-[10px] text-muted-foreground">
+          {asset.groupType || "素材库"}
+        </div>
+      </div>
+    </div>
   );
 }
 

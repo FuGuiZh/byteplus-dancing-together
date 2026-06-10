@@ -17,9 +17,11 @@ import type {
   ApiResponseMessage,
   ConversationMessage,
   GenerationResponse,
+  SelectedGenerationAsset,
   TextToVideoSessionRecord,
   UploadedImage,
 } from "@/components/text-to-video/types";
+import { normalizeAssets } from "@/components/assets/assets-utils";
 
 function createMessageId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -350,6 +352,17 @@ export function useTextToVideoSession() {
   const [uploadedImages, setUploadedImages] = React.useState<UploadedImage[]>(
     []
   );
+  const [selectedAssets, setSelectedAssets] = React.useState<
+    SelectedGenerationAsset[]
+  >([]);
+  const [assetLibraryImages, setAssetLibraryImages] = React.useState<
+    SelectedGenerationAsset[]
+  >([]);
+  const [isLoadingAssetLibraryImages, setIsLoadingAssetLibraryImages] =
+    React.useState(false);
+  const [assetLibraryError, setAssetLibraryError] = React.useState<
+    string | null
+  >(null);
   const [isUploading, setIsUploading] = React.useState(false);
   const [inputError, setInputError] = React.useState<string | null>(null);
 
@@ -702,6 +715,94 @@ export function useTextToVideoSession() {
     }
   }
 
+  async function loadAssetLibraryImages() {
+    setAssetLibraryError(null);
+    setIsLoadingAssetLibraryImages(true);
+
+    try {
+      const groupTypes = ["AIGC", "LivenessFace"];
+      const results = await Promise.allSettled(
+        groupTypes.map(async (groupType) => {
+          const params = new URLSearchParams({
+            asset_kind: "Image",
+            group_type: groupType,
+            page_size: "100",
+            sort_by: "UpdateTime",
+            sort_order: "Desc",
+            status: "Active",
+          });
+          const response = await fetch(
+            `/api/byteplus/assets?${params.toString()}`,
+            {
+              cache: "no-store",
+            }
+          );
+          const payload = (await response.json().catch(() => ({}))) as unknown;
+
+          if (!response.ok) {
+            const message =
+              getResponseMessage(payload) ??
+              `${groupType} 素材库图片加载失败。`;
+            throw new Error(message);
+          }
+
+          return normalizeAssets(payload);
+        })
+      );
+      const successfulAssets = results.flatMap((result) =>
+        result.status === "fulfilled" ? result.value : []
+      );
+      const failures = results
+        .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+        .map((result) =>
+          result.reason instanceof Error ? result.reason.message : "素材查询失败。"
+        );
+
+      if (successfulAssets.length === 0 && failures.length > 0) {
+        throw new Error(failures.join("；"));
+      }
+
+      const uniqueAssets = new Map(
+        successfulAssets
+        .filter(
+          (asset) => asset.assetKind === "Image" && asset.status === "Active"
+        )
+        .map((asset) => [
+          asset.id,
+          {
+            assetKind: asset.assetKind,
+            groupId: asset.groupId,
+            groupType: asset.groupType,
+            id: asset.id,
+            name: asset.name,
+            status: asset.status,
+            url: asset.url,
+          },
+        ])
+      );
+
+      setAssetLibraryImages([...uniqueAssets.values()]);
+      setAssetLibraryError(failures.length > 0 ? failures.join("；") : null);
+    } catch (error) {
+      setAssetLibraryError(
+        error instanceof Error ? error.message : "素材库图片加载失败。"
+      );
+    } finally {
+      setIsLoadingAssetLibraryImages(false);
+    }
+  }
+
+  function selectAssetImage(asset: SelectedGenerationAsset) {
+    setInputError(null);
+    setSelectedAssets((current) => {
+      if (current.some((candidate) => candidate.id === asset.id)) {
+        return current;
+      }
+
+      return [...current, asset];
+    });
+  }
+
   async function submitPrompt() {
     const nextPrompt = prompt.trim();
     if (!nextPrompt || isBusy || isUploading) {
@@ -710,6 +811,7 @@ export function useTextToVideoSession() {
 
     const sourceSessionId = sessionState.activeSessionId;
     const imagePreviews = uploadedImages;
+    const assetPreviews = selectedAssets;
     const imageName =
       imagePreviews.length === 1 ? imagePreviews[0].name : undefined;
     const imageDataUrl =
@@ -721,6 +823,7 @@ export function useTextToVideoSession() {
       type: "user",
       text: nextPrompt,
       imageName,
+      assetPreviews,
     });
     setPrompt("");
     updateSessionTaskState(sourceSessionId, {
@@ -730,6 +833,7 @@ export function useTextToVideoSession() {
     lastProviderStatusBySessionRef.current.delete(sourceSessionId);
     setInputError(null);
     setUploadedImages([]);
+    setSelectedAssets([]);
     appendActivity(
       sourceSessionId,
       "正在提交生成请求",
@@ -744,7 +848,11 @@ export function useTextToVideoSession() {
       abortController
     );
     const requestBody = {
-      assetRefs: [],
+      assetRefs: assetPreviews.map((asset) => ({
+        assetId: asset.id,
+        assetKind: asset.assetKind,
+        role: "reference_image",
+      })),
       imageRefs: imagePreviews.map((image) => ({
         url: image.dataUrl,
         role: "reference_image",
@@ -914,6 +1022,7 @@ export function useTextToVideoSession() {
     });
     setPrompt("");
     setUploadedImages([]);
+    setSelectedAssets([]);
     setInputError(null);
   }
 
@@ -960,6 +1069,7 @@ export function useTextToVideoSession() {
     });
     setPrompt("");
     setUploadedImages([]);
+    setSelectedAssets([]);
     setInputError(null);
   }
 
@@ -999,6 +1109,7 @@ export function useTextToVideoSession() {
     }));
     setPrompt("");
     setUploadedImages([]);
+    setSelectedAssets([]);
     setInputError(null);
   }
 
@@ -1109,13 +1220,22 @@ export function useTextToVideoSession() {
     );
   }
 
+  function removeSelectedAsset(assetId: string) {
+    setSelectedAssets((current) =>
+      current.filter((asset) => asset.id !== assetId)
+    );
+  }
+
   return {
     activeSessionId: activeSession?.id ?? sessionState.activeSessionId,
+    assetLibraryError,
+    assetLibraryImages,
     canSubmit,
     createSession,
     deleteSession,
     duration,
     inputError,
+    isLoadingAssetLibraryImages,
     isBusy,
     isUploading,
     messages,
@@ -1128,6 +1248,8 @@ export function useTextToVideoSession() {
     setPrompt,
     setRatio,
     setResolution,
+    selectedAssets,
+    selectAssetImage,
     renameSession,
     sessions: sessionState.sessions.filter(hasSessionContent),
     selectSession,
@@ -1135,6 +1257,8 @@ export function useTextToVideoSession() {
     submitPrompt,
     taskStatus,
     uploadedImages,
+    loadAssetLibraryImages,
+    removeSelectedAsset,
     removeUploadedImage,
     uploadImageFiles,
     openSessionStorageDirectory,

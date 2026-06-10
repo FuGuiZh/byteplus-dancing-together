@@ -69,6 +69,8 @@ type AssetGroupListResult = {
   [key: string]: unknown;
 };
 
+const DEFAULT_ASSET_GROUP_TYPE = "AIGC";
+
 function requireIamCredential(
   config: BytePlusConfig,
   key: "BYTEPLUS_IAM_ACCESS_KEY_ID" | "BYTEPLUS_IAM_SECRET_ACCESS_KEY"
@@ -86,14 +88,22 @@ function requireIamCredential(
   return value;
 }
 
+function normalizeOpenApiHost(host: string) {
+  return host.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+}
+
+function normalizeOpenApiProtocol(protocol: string) {
+  return protocol.endsWith(":") ? protocol : `${protocol}:`;
+}
+
 function createArkService(config: BytePlusConfig) {
   return new Service({
     accessKeyId: requireIamCredential(config, "BYTEPLUS_IAM_ACCESS_KEY_ID"),
     secretKey: requireIamCredential(config, "BYTEPLUS_IAM_SECRET_ACCESS_KEY"),
     serviceName: "ark",
     region: config.BYTEPLUS_REGION,
-    host: config.byteplus.openApiHost,
-    protocol: config.byteplus.openApiProtocol,
+    host: normalizeOpenApiHost(config.byteplus.openApiHost),
+    protocol: normalizeOpenApiProtocol(config.byteplus.openApiProtocol),
     defaultVersion: ARK_OPENAPI_VERSION,
   });
 }
@@ -212,7 +222,7 @@ export async function listBytePlusAssetGroups(
       Filter: {
         GroupIds: filters.groupId ? [filters.groupId] : undefined,
         Name: filters.name,
-        GroupType: filters.groupType,
+        GroupType: filters.groupType ?? DEFAULT_ASSET_GROUP_TYPE,
       },
       PageNumber: filters.pageNumber,
       PageSize: filters.pageSize,
@@ -341,7 +351,7 @@ export async function listBytePlusAssets(
     withProjectName(config, {
       Filter: {
         GroupIds: filters.groupId ? [filters.groupId] : undefined,
-        GroupType: filters.groupType,
+        GroupType: filters.groupType ?? DEFAULT_ASSET_GROUP_TYPE,
         Statuses: filters.status ? [filters.status] : undefined,
         Name: filters.name,
       },
