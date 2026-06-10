@@ -311,8 +311,8 @@ export function AssetsWorkspace() {
     imageUploadInputRef.current?.click();
   }
 
-  async function uploadImageFiles(files: File[]) {
-    const groupId = getActiveUploadGroupId();
+  async function uploadImageFiles(files: File[], targetGroupId?: string) {
+    const groupId = targetGroupId ?? getActiveUploadGroupId();
 
     if (!groupId) {
       setApiSnapshot({
@@ -323,6 +323,8 @@ export function AssetsWorkspace() {
       });
       return;
     }
+
+    setAssetForm((current) => ({ ...current, groupId }));
 
     if (files.length === 0) {
       return;
@@ -649,8 +651,19 @@ export function AssetsWorkspace() {
             onOpenAsset={openAsset}
             onRefresh={() => void refreshAll()}
             onRename={renameSelection}
+            onDropRejected={(message) =>
+              setApiSnapshot({
+                label: "拖拽图片入库",
+                method: "POST",
+                path: "/api/byteplus/assets/file-upload",
+                error: message,
+              })
+            }
             onScopeChange={handleScopeChange}
             onSelect={setSelection}
+            onUploadImageFiles={(files, groupId) =>
+              void uploadImageFiles(files, groupId)
+            }
             onUploadImages={openImageUploadPicker}
             onViewModeChange={setViewMode}
             scope={scope}

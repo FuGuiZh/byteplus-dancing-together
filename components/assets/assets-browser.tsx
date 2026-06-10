@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import {
   AudioLines,
   ExternalLink,
@@ -52,11 +53,13 @@ export function AssetsBrowser({
   onCreateGroup,
   onDelete,
   onDetail,
+  onDropRejected,
   onOpenAsset,
   onRename,
   onRefresh,
   onScopeChange,
   onSelect,
+  onUploadImageFiles,
   onUploadImages,
   onViewModeChange,
   scope,
@@ -71,19 +74,81 @@ export function AssetsBrowser({
   onCreateGroup: () => void;
   onDelete: () => void;
   onDetail: () => void;
+  onDropRejected: (message: string) => void;
   onOpenAsset: (asset: AssetItem) => void;
   onRename: () => void;
   onRefresh: () => void;
   onScopeChange: (scope: AssetScope) => void;
   onSelect: (selection: AssetSelection) => void;
+  onUploadImageFiles: (files: File[], groupId: string) => void;
   onUploadImages: () => void;
   onViewModeChange: (value: AssetViewMode) => void;
   scope: AssetScope;
   selection: AssetSelection;
   viewMode: AssetViewMode;
 }) {
+  const [dragDepth, setDragDepth] = React.useState(0);
   const showGroups = scope.type === "root";
   const isEmpty = groups.length === 0 && assets.length === 0;
+  const canDropImages = scope.type === "group";
+  const isDraggingFiles = dragDepth > 0;
+  const dropTargetGroupId = scope.type === "group" ? scope.groupId : "";
+
+  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
+    if (!hasFileTransfer(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (canDropImages) {
+      setDragDepth((current) => current + 1);
+    }
+  }
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    if (!hasFileTransfer(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = canDropImages ? "copy" : "none";
+  }
+
+  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
+    if (!hasFileTransfer(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (canDropImages) {
+      setDragDepth((current) => Math.max(0, current - 1));
+    }
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    if (!hasFileTransfer(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    setDragDepth(0);
+
+    if (!canDropImages || !dropTargetGroupId) {
+      onDropRejected("请先打开一个素材组，再把本地图片拖拽到素材文件区入库。");
+      return;
+    }
+
+    const imageFiles = getImageFilesFromDataTransfer(event.dataTransfer);
+
+    if (imageFiles.length === 0) {
+      onDropRejected("拖拽内容里没有可入库的图片文件。");
+      return;
+    }
+
+    onUploadImageFiles(imageFiles, dropTargetGroupId);
+  }
 
   return (
     <div className="grid h-full min-w-0 max-w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
@@ -103,7 +168,16 @@ export function AssetsBrowser({
 
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="min-h-0 min-w-0 max-w-full overflow-hidden">
+          <div
+            className={cn(
+              "relative min-h-0 min-w-0 max-w-full overflow-hidden transition-colors",
+              canDropImages && isDraggingFiles && "bg-primary/5"
+            )}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
             <ScrollArea className="h-full min-h-0 min-w-0 max-w-full overflow-hidden">
               {isEmpty ? (
                 <div className="flex min-h-[420px] items-center justify-center p-8 text-center">
@@ -118,6 +192,11 @@ export function AssetsBrowser({
                       可以先创建 AIGC 素材组，再用 BytePlus 可访问的 URL
                       或本地图片文件入库素材。
                     </p>
+                    {canDropImages ? (
+                      <p className="mt-3 text-xs font-bold text-primary">
+                        也可以直接拖拽本地图片到这里，入库到当前素材组。
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               ) : viewMode === "grid" ? (
@@ -172,6 +251,24 @@ export function AssetsBrowser({
                 />
               )}
             </ScrollArea>
+            {canDropImages ? (
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-5 z-20 flex items-center justify-center rounded-[var(--ui-radius)] border-2 border-dashed border-primary bg-background/85 text-center shadow-lg backdrop-blur-sm transition-opacity",
+                  isDraggingFiles ? "opacity-100" : "opacity-0"
+                )}
+              >
+                <div className="max-w-sm px-6">
+                  <div className="mx-auto flex size-14 items-center justify-center rounded-[var(--ui-radius)] bg-primary text-primary-foreground">
+                    <ImageUp className="size-7" />
+                  </div>
+                  <div className="mt-4 text-base font-bold">松手后图片入库</div>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    目标是当前打开的素材组；只会提交图片文件。
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </div>
         </ContextMenuTrigger>
         <BrowserContextMenu
@@ -189,6 +286,28 @@ export function AssetsBrowser({
       </ContextMenu>
     </div>
   );
+}
+
+function hasFileTransfer(dataTransfer: DataTransfer) {
+  return Array.from(dataTransfer.types).includes("Files");
+}
+
+function isLikelyImageFile(file: File) {
+  if (file.type.startsWith("image/")) {
+    return true;
+  }
+
+  return /\.(avif|gif|jpe?g|png|webp)$/i.test(file.name);
+}
+
+function getImageFilesFromDataTransfer(dataTransfer: DataTransfer) {
+  const itemFiles = Array.from(dataTransfer.items ?? [])
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+  const files = itemFiles.length > 0 ? itemFiles : Array.from(dataTransfer.files);
+
+  return files.filter(isLikelyImageFile);
 }
 
 function BrowserContextMenu({
