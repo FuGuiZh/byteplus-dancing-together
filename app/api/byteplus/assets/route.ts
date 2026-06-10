@@ -17,6 +17,7 @@ import {
 } from "@/lib/byteplus-openapi-client";
 import {
   createLocalFallbackAsset,
+  createLocalFallbackAssetDetail,
   createLocalFallbackAssetList,
 } from "@/lib/byteplus-local-fallback";
 
@@ -62,21 +63,20 @@ export async function GET(request: Request) {
       return NextResponse.json(
         await listBytePlusAssets(config, {
           groupId: searchParams.get("group_id") ?? undefined,
+          groupType: searchParams.get("group_type") ?? undefined,
           assetKind: searchParams.get("asset_kind") ?? undefined,
           name: searchParams.get("name") ?? undefined,
           status: searchParams.get("status") ?? undefined,
           pageNumber: readPositiveInteger(searchParams.get("page_number")),
           pageSize: readPositiveInteger(searchParams.get("page_size")),
+          sortBy: searchParams.get("sort_by") ?? undefined,
+          sortOrder: searchParams.get("sort_order") ?? undefined,
         })
       );
     }
 
     if (assetId) {
-      return NextResponse.json({
-        mode: "local",
-        assetId,
-        status: "Active",
-      });
+      return NextResponse.json(createLocalFallbackAssetDetail(assetId, config));
     }
 
     return NextResponse.json(createLocalFallbackAssetList(config));

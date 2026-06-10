@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Settings,
   Sun,
+  UserCheck,
 } from "lucide-react";
 
 import {
@@ -45,6 +46,12 @@ const navItems = [
     label: "作品库",
     description: "生成视频归档",
     icon: Film,
+  },
+  {
+    href: "/real-person",
+    label: "真人认证",
+    description: "H5 活体认证流程",
+    icon: UserCheck,
   },
   {
     href: "/generate",
@@ -161,8 +168,8 @@ export function AppShell({
   }, [settingsOpen]);
 
   return (
-    <main className="min-h-[100dvh] bg-background text-foreground">
-      <div className="min-h-[100dvh] lg:pl-[72px]">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-background text-foreground">
+      <div className="min-h-[100dvh] min-w-0 max-w-full lg:pl-[72px]">
         <aside className="sticky top-0 z-30 border-b border-border bg-card lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-[72px] lg:flex-col lg:border-b-0 lg:border-r">
           <div
             aria-hidden="true"
@@ -289,7 +296,7 @@ export function AppShell({
           ) : null}
         </aside>
 
-        <section className="min-w-0">
+        <section className="min-w-0 max-w-full overflow-x-hidden">
           <div className={cn("px-5 py-5 lg:px-7 lg:py-7", contentClassName)}>
             {children}
           </div>

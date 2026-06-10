@@ -28,6 +28,15 @@ export const assetGroupRequestSchema = z.object({
   groupType: z.enum(["AIGC"]).default("AIGC"),
 });
 
+export const assetGroupUpdateRequestSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+});
+
+export const assetUpdateRequestSchema = z.object({
+  name: z.string().min(1),
+});
+
 export const generationTaskActionRequestSchema = z.object({
   action: z.enum(["cancel", "delete"]),
 });
@@ -68,6 +77,10 @@ export type VisualValidateResultRequest = z.infer<
 >;
 export type AssetUploadRequest = z.infer<typeof assetUploadRequestSchema>;
 export type AssetGroupRequest = z.infer<typeof assetGroupRequestSchema>;
+export type AssetGroupUpdateRequest = z.infer<
+  typeof assetGroupUpdateRequestSchema
+>;
+export type AssetUpdateRequest = z.infer<typeof assetUpdateRequestSchema>;
 export type GenerationTaskActionRequest = z.infer<
   typeof generationTaskActionRequestSchema
 >;

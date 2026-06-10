@@ -58,10 +58,13 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       await listBytePlusAssetGroups(config, {
+        groupId: searchParams.get("group_id") ?? undefined,
         name: searchParams.get("name") ?? undefined,
         groupType: searchParams.get("group_type") ?? undefined,
         pageNumber: readPositiveInteger(searchParams.get("page_number")),
         pageSize: readPositiveInteger(searchParams.get("page_size")),
+        sortBy: searchParams.get("sort_by") ?? undefined,
+        sortOrder: searchParams.get("sort_order") ?? undefined,
       })
     );
   } catch (error) {

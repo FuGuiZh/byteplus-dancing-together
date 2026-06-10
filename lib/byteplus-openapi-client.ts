@@ -4,6 +4,8 @@ import { appUrl } from "@/lib/app-url";
 import type { BytePlusConfig } from "@/lib/byteplus-config";
 import type {
   AssetGroupRequest,
+  AssetGroupUpdateRequest,
+  AssetUpdateRequest,
   AssetUploadRequest,
   RealPersonSessionRequest,
 } from "@/lib/byteplus-contracts";
@@ -31,10 +33,22 @@ type AssetGroupResult = {
   GroupId?: string;
 };
 
+type AssetGroupDetailResult = {
+  Id?: string;
+  Name?: string;
+  Description?: string;
+  GroupType?: string;
+  ProjectName?: string;
+  CreateTime?: string;
+  UpdateTime?: string;
+  [key: string]: unknown;
+};
+
 type AssetResult = {
   Id?: string;
   AssetId?: string;
   AssetItem?: OpenApiRecord;
+  [key: string]: unknown;
 };
 
 type AssetListResult = {
@@ -182,20 +196,28 @@ export async function getBytePlusVisualValidateResult(
 export async function listBytePlusAssetGroups(
   config: BytePlusConfig,
   filters: {
+    groupId?: string;
     name?: string;
     groupType?: string;
     pageNumber?: number;
     pageSize?: number;
+    sortBy?: string;
+    sortOrder?: string;
   } = {}
 ) {
   const { response, result } = await requestArkAction<AssetGroupListResult>(
     config,
     "ListAssetGroups",
     withProjectName(config, {
-      Name: filters.name,
-      GroupType: filters.groupType,
+      Filter: {
+        GroupIds: filters.groupId ? [filters.groupId] : undefined,
+        Name: filters.name,
+        GroupType: filters.groupType,
+      },
       PageNumber: filters.pageNumber,
       PageSize: filters.pageSize,
+      SortBy: filters.sortBy,
+      SortOrder: filters.sortOrder,
     })
   );
 
@@ -205,6 +227,27 @@ export async function listBytePlusAssetGroups(
     items: result.Items ?? result.AssetGroups ?? [],
     total: result.Total ?? result.TotalCount,
     nextToken: result.NextToken,
+    provider: response,
+  };
+}
+
+export async function getBytePlusAssetGroup(
+  groupId: string,
+  config: BytePlusConfig
+) {
+  const { response, result } = await requestArkAction<AssetGroupDetailResult>(
+    config,
+    "GetAssetGroup",
+    withProjectName(config, {
+      Id: groupId,
+    })
+  );
+
+  return {
+    mode: "live",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    groupId,
+    assetGroup: result,
     provider: response,
   };
 }
@@ -234,27 +277,79 @@ export async function createBytePlusAssetGroup(
   };
 }
 
+export async function updateBytePlusAssetGroup(
+  groupId: string,
+  input: AssetGroupUpdateRequest,
+  config: BytePlusConfig
+) {
+  const { response, result } = await requestArkAction<AssetGroupResult>(
+    config,
+    "UpdateAssetGroup",
+    withProjectName(config, {
+      Id: groupId,
+      Name: input.name,
+      Description: input.description,
+    })
+  );
+
+  return {
+    mode: "live",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    groupId: readResultId(result as OpenApiRecord, ["Id", "GroupId"]) ?? groupId,
+    provider: response,
+  };
+}
+
+export async function deleteBytePlusAssetGroup(
+  groupId: string,
+  config: BytePlusConfig
+) {
+  const { response } = await requestArkAction<OpenApiRecord>(
+    config,
+    "DeleteAssetGroup",
+    withProjectName(config, {
+      Id: groupId,
+    })
+  );
+
+  return {
+    mode: "live",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    groupId,
+    deleted: true,
+    provider: response,
+  };
+}
+
 export async function listBytePlusAssets(
   config: BytePlusConfig,
   filters: {
     groupId?: string;
+    groupType?: string;
     assetKind?: string;
     name?: string;
     status?: string;
     pageNumber?: number;
     pageSize?: number;
+    sortBy?: string;
+    sortOrder?: string;
   } = {}
 ) {
   const { response, result } = await requestArkAction<AssetListResult>(
     config,
     "ListAssets",
     withProjectName(config, {
-      GroupId: filters.groupId,
+      Filter: {
+        GroupIds: filters.groupId ? [filters.groupId] : undefined,
+        GroupType: filters.groupType,
+        Statuses: filters.status ? [filters.status] : undefined,
+        Name: filters.name,
+      },
       AssetType: filters.assetKind,
-      Name: filters.name,
-      Status: filters.status,
       PageNumber: filters.pageNumber,
       PageSize: filters.pageSize,
+      SortBy: filters.sortBy,
+      SortOrder: filters.sortOrder,
     })
   );
 
@@ -336,8 +431,53 @@ export async function getBytePlusAsset(assetId: string, config: BytePlusConfig) 
 
   return {
     mode: "live",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
     assetId,
     asset: assetItem,
+    provider: response,
+  };
+}
+
+export async function updateBytePlusAsset(
+  assetId: string,
+  input: AssetUpdateRequest,
+  config: BytePlusConfig
+) {
+  const { response, result } = await requestArkAction<AssetResult>(
+    config,
+    "UpdateAsset",
+    withProjectName(config, {
+      Id: assetId,
+      Name: input.name,
+    })
+  );
+  const resultId = readResultId(result as OpenApiRecord, ["Id", "AssetId"]);
+
+  return {
+    mode: "live",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    assetId: resultId ?? assetId,
+    provider: response,
+  };
+}
+
+export async function deleteBytePlusAsset(
+  assetId: string,
+  config: BytePlusConfig
+) {
+  const { response } = await requestArkAction<OpenApiRecord>(
+    config,
+    "DeleteAsset",
+    withProjectName(config, {
+      Id: assetId,
+    })
+  );
+
+  return {
+    mode: "live",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    assetId,
+    deleted: true,
     provider: response,
   };
 }

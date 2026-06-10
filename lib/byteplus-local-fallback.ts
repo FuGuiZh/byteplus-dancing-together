@@ -3,6 +3,8 @@ import type { BytePlusConfig } from "@/lib/byteplus-config";
 import { getSeedanceEndpoint } from "@/lib/byteplus-config";
 import type {
   AssetGroupRequest,
+  AssetGroupUpdateRequest,
+  AssetUpdateRequest,
   AssetUploadRequest,
   GenerationTaskRequest,
   RealPersonSessionRequest,
@@ -88,27 +90,106 @@ export function createLocalFallbackAsset(
 
 export function createLocalFallbackAssetList(config: BytePlusConfig) {
   const stamp = compactTimestamp();
+  const updatedAt = new Date().toISOString();
 
   return {
     mode: "local",
     projectName: config.BYTEPLUS_PROJECT_NAME,
     items: [
       {
+        Id: `asset-${stamp}-image`,
         assetId: `asset-${stamp}-image`,
+        GroupId: `group-${stamp}-virtual`,
         groupId: `group-${stamp}-default`,
+        AssetType: "Image",
         assetKind: "Image",
-        name: "front-portrait",
-        status: "Active",
+        Name: "front-portrait",
+        URL: "https://example.com/assets/front-portrait.png",
+        Status: "Active",
+        Moderation: { Strategy: "Default" },
+        ProjectName: config.BYTEPLUS_PROJECT_NAME,
+        CreateTime: updatedAt,
+        UpdateTime: updatedAt,
       },
       {
+        Id: `asset-${stamp}-audio`,
         assetId: `asset-${stamp}-audio`,
+        GroupId: `group-${stamp}-virtual`,
         groupId: `group-${stamp}-default`,
+        AssetType: "Audio",
         assetKind: "Audio",
-        name: "dance-beat",
-        status: "Processing",
+        Name: "dance-beat",
+        URL: "https://example.com/assets/dance-beat.mp3",
+        Status: "Processing",
+        Moderation: { Strategy: "Default" },
+        ProjectName: config.BYTEPLUS_PROJECT_NAME,
+        CreateTime: updatedAt,
+        UpdateTime: updatedAt,
       },
     ],
+    TotalCount: 2,
     total: 2,
+  };
+}
+
+export function createLocalFallbackAssetDetail(
+  assetId: string,
+  config: BytePlusConfig
+) {
+  const updatedAt = new Date().toISOString();
+  const normalizedId = normalizeIdPart(assetId);
+  const assetKind = normalizedId.includes("audio")
+    ? "Audio"
+    : normalizedId.includes("video")
+      ? "Video"
+      : "Image";
+
+  return {
+    mode: "local",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    assetId,
+    asset: {
+      Id: assetId,
+      Name: assetId,
+      URL: `https://example.com/assets/${assetId}`,
+      GroupId: `group-${compactTimestamp()}-virtual`,
+      AssetType: assetKind,
+      Status: "Active",
+      Moderation: { Strategy: "Default" },
+      ProjectName: config.BYTEPLUS_PROJECT_NAME,
+      CreateTime: updatedAt,
+      UpdateTime: updatedAt,
+    },
+  };
+}
+
+export function createLocalFallbackAssetUpdate(
+  assetId: string,
+  input: AssetUpdateRequest,
+  config: BytePlusConfig
+) {
+  return {
+    mode: "local",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    assetId,
+    updated: true,
+    asset: {
+      Id: assetId,
+      Name: input.name,
+      UpdateTime: new Date().toISOString(),
+    },
+  };
+}
+
+export function createLocalFallbackAssetDelete(
+  assetId: string,
+  config: BytePlusConfig
+) {
+  return {
+    mode: "local",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    assetId,
+    deleted: true,
   };
 }
 
@@ -132,25 +213,90 @@ export function createLocalFallbackAssetGroup(
 
 export function createLocalFallbackAssetGroupList(config: BytePlusConfig) {
   const stamp = compactTimestamp();
+  const updatedAt = new Date().toISOString();
 
   return {
     mode: "local",
     projectName: config.BYTEPLUS_PROJECT_NAME,
     items: [
       {
+        Id: `group-${stamp}-real-human`,
         groupId: `group-${stamp}-real-human`,
-        name: "verified-real-human",
-        groupType: "REAL_HUMAN",
-        status: "Active",
+        Name: "verified-real-human",
+        Description: "真人认证生成的 LivenessFace 素材组。",
+        GroupType: "LivenessFace",
+        ProjectName: config.BYTEPLUS_PROJECT_NAME,
+        CreateTime: updatedAt,
+        UpdateTime: updatedAt,
       },
       {
+        Id: `group-${stamp}-virtual`,
         groupId: `group-${stamp}-virtual`,
-        name: "virtual-dancer",
-        groupType: "AIGC",
-        status: "Active",
+        Name: "virtual-dancer",
+        Description: "可手动创建的 AIGC 私域素材组。",
+        GroupType: "AIGC",
+        ProjectName: config.BYTEPLUS_PROJECT_NAME,
+        CreateTime: updatedAt,
+        UpdateTime: updatedAt,
       },
     ],
+    TotalCount: 2,
     total: 2,
+  };
+}
+
+export function createLocalFallbackAssetGroupDetail(
+  groupId: string,
+  config: BytePlusConfig
+) {
+  const updatedAt = new Date().toISOString();
+
+  return {
+    mode: "local",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    groupId,
+    assetGroup: {
+      Id: groupId,
+      Name: groupId,
+      Description: "本地兜底素材组详情。",
+      GroupType: groupId.toLowerCase().includes("real")
+        ? "LivenessFace"
+        : "AIGC",
+      ProjectName: config.BYTEPLUS_PROJECT_NAME,
+      CreateTime: updatedAt,
+      UpdateTime: updatedAt,
+    },
+  };
+}
+
+export function createLocalFallbackAssetGroupUpdate(
+  groupId: string,
+  input: AssetGroupUpdateRequest,
+  config: BytePlusConfig
+) {
+  return {
+    mode: "local",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    groupId,
+    updated: true,
+    assetGroup: {
+      Id: groupId,
+      Name: input.name ?? groupId,
+      Description: input.description,
+      UpdateTime: new Date().toISOString(),
+    },
+  };
+}
+
+export function createLocalFallbackAssetGroupDelete(
+  groupId: string,
+  config: BytePlusConfig
+) {
+  return {
+    mode: "local",
+    projectName: config.BYTEPLUS_PROJECT_NAME,
+    groupId,
+    deleted: true,
   };
 }
 
