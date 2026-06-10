@@ -19,6 +19,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { TextToVideoSessionRecord } from "@/components/text-to-video/types";
 
@@ -113,8 +114,8 @@ export function SessionHistoryRail({
                     )}
                   >
                     <MessageCircle className="size-4 shrink-0" />
-                    <input
-                      className="min-w-0 flex-1 bg-transparent outline-none"
+                    <Input
+                      className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
                       onBlur={commitRename}
                       onChange={(event) =>
                         setRenamingSession((current) =>

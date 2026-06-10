@@ -36,6 +36,29 @@ export type GeneratedContentAssetView = {
   provider?: unknown;
 };
 
+export type GeneratedVideoTaskListItem = {
+  id: string;
+  status?: string;
+  model?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  ratio?: string;
+  duration?: number;
+  resolution?: string;
+  hasVideoUrl: boolean;
+  error?: unknown;
+  usage?: unknown;
+};
+
+export type GeneratedVideoTaskList = {
+  total: number | null;
+  loaded: number;
+  statusFilter?: string;
+  pageSize?: number;
+  maxPages?: number;
+  items: GeneratedVideoTaskListItem[];
+};
+
 export type GeneratedContentAssetsResponse = {
   assets: GeneratedContentAssetView[];
   storage?: {
@@ -68,6 +91,7 @@ export type GeneratedContentAssetsResponse = {
       downloadLimit?: number;
       downloadTimeoutMs?: number;
     };
+    taskList?: GeneratedVideoTaskList;
     provider?: unknown;
   };
 };

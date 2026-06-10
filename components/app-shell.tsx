@@ -35,13 +35,19 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   {
-    href: "/text-to-video",
+    href: "/",
     label: "文生视频",
     description: "仅用文本创建视频",
     icon: MessageSquareText,
   },
   {
-    href: "/",
+    href: "/generated-videos",
+    label: "作品库",
+    description: "生成视频归档",
+    icon: Film,
+  },
+  {
+    href: "/generate",
     label: "生成",
     description: "创建视频任务",
     icon: Clapperboard,
@@ -57,12 +63,6 @@ const navItems = [
     label: "素材",
     description: "素材入库与状态",
     icon: Library,
-  },
-  {
-    href: "/generated-assets",
-    label: "作品库",
-    description: "生成视频资产",
-    icon: Film,
   },
 ];
 
@@ -80,7 +80,7 @@ function isActive(pathname: string, href: string) {
     return pathname === "/";
   }
 
-  return pathname.startsWith(href);
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function AppShell({

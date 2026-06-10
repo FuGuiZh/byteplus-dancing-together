@@ -11,11 +11,11 @@ const defaultBytePlusConfig = {
 };
 
 const defaultGenerationConfig = {
-  defaultRatio: "9:16",
-  defaultDuration: 8,
-  defaultResolution: "720p",
+  defaultRatio: "16:9",
+  defaultDuration: 4,
+  defaultResolution: "480p",
   defaultGenerateAudio: true,
-  defaultUseFastEndpoint: false,
+  defaultUseFastEndpoint: true,
   defaultWatermark: false,
 };
 
@@ -41,11 +41,11 @@ const appConfigSchema = z.object({
     .default(defaultBytePlusConfig),
   generation: z
     .object({
-      defaultRatio: z.string().min(1).default("9:16"),
-      defaultDuration: z.number().int().positive().default(8),
-      defaultResolution: z.string().min(1).default("720p"),
+      defaultRatio: z.string().min(1).default("16:9"),
+      defaultDuration: z.number().int().positive().default(4),
+      defaultResolution: z.string().min(1).default("480p"),
       defaultGenerateAudio: z.boolean().default(true),
-      defaultUseFastEndpoint: z.boolean().default(false),
+      defaultUseFastEndpoint: z.boolean().default(true),
       defaultWatermark: z.boolean().default(false),
     })
     .default(defaultGenerationConfig),

@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import {
+  defaultTextToVideoSettings,
   isTerminalVideoTaskStatus,
   isVideoTaskStatus,
   type LocalVideoTaskStatus,
@@ -334,10 +335,18 @@ export function useTextToVideoSession() {
   );
   const [hasLoadedSessions, setHasLoadedSessions] = React.useState(false);
   const [prompt, setPrompt] = React.useState("");
-  const [ratio, setRatio] = React.useState<VideoRatio>("16:9");
-  const [modelMode, setModelMode] = React.useState<VideoModelMode>("flash");
-  const [duration, setDuration] = React.useState<VideoDuration>("5");
-  const [resolution, setResolution] = React.useState<VideoResolution>("720p");
+  const [ratio, setRatio] = React.useState<VideoRatio>(
+    defaultTextToVideoSettings.ratio
+  );
+  const [modelMode, setModelMode] = React.useState<VideoModelMode>(
+    defaultTextToVideoSettings.modelMode
+  );
+  const [duration, setDuration] = React.useState<VideoDuration>(
+    defaultTextToVideoSettings.duration
+  );
+  const [resolution, setResolution] = React.useState<VideoResolution>(
+    defaultTextToVideoSettings.resolution
+  );
   const [uploadedImages, setUploadedImages] = React.useState<UploadedImage[]>(
     []
   );

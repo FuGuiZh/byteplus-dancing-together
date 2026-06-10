@@ -4,7 +4,6 @@ import Image from "next/image";
 import * as React from "react";
 import {
   Activity,
-  ChevronDown,
   ImagePlus,
   Send,
   Square,
@@ -23,6 +22,19 @@ import {
 } from "@/lib/video-generation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { UploadedImage } from "@/components/text-to-video/types";
 
 type VideoPromptComposerProps = {
@@ -138,31 +150,39 @@ export function VideoPromptComposer({
                 unoptimized
                 width={96}
               />
-              <button
-                aria-label={`移除图片 ${image.name}`}
-                className="absolute right-1.5 top-1.5 hidden size-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm backdrop-blur hover:bg-background group-hover/image:flex focus:flex"
-                onClick={() => onRemoveImage(image.id)}
-                type="button"
-              >
-                <X className="size-4" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label={`移除图片 ${image.name}`}
+                    className="absolute right-1.5 top-1.5 hidden size-6 rounded-full bg-background/90 p-0 text-foreground shadow-sm backdrop-blur hover:bg-background group-hover/image:inline-flex focus:inline-flex"
+                    onClick={() => onRemoveImage(image.id)}
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>移除图片</TooltipContent>
+              </Tooltip>
             </div>
           ))}
         </div>
       ) : null}
 
-      <div className="flex min-w-0 items-start gap-3">
-        <textarea
-          className="min-h-16 flex-1 resize-none bg-transparent px-2 py-2 text-base leading-6 outline-none placeholder:text-muted-foreground"
+      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_140px_44px] md:items-start">
+        <Textarea
+          className="min-h-20 resize-none border-0 bg-transparent px-2 py-2 text-base leading-6 shadow-none focus-visible:ring-0"
           id="text-to-video-prompt"
           onChange={(event) => setPrompt(event.target.value)}
           onKeyDown={handleKeyDown}
           placeholder=""
-          rows={2}
+          rows={3}
           value={prompt}
         />
         <SelectPill
           ariaLabel="选择模型"
+          className="md:w-[140px]"
           onChange={setModelMode}
           options={videoModelOptions}
           value={modelMode}
@@ -189,32 +209,41 @@ export function VideoPromptComposer({
       </div>
 
       <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
-        <button
-          className="flex h-9 items-center justify-center rounded-full border-border bg-background text-sm text-foreground [border-width:var(--ui-border-width)] hover:bg-muted disabled:opacity-50"
-          disabled={isUploading || isBusy}
-          onClick={() => fileInputRef.current?.click()}
-          type="button"
-        >
-          {isUploading ? (
-            <Activity className="size-4 animate-pulse" />
-          ) : (
-            <ImagePlus className="size-4" />
-          )}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="h-9 rounded-full shadow-none"
+              disabled={isUploading || isBusy}
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+              variant="outline"
+            >
+              {isUploading ? (
+                <Activity className="size-4 animate-pulse" />
+              ) : (
+                <ImagePlus className="size-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>上传参考图片</TooltipContent>
+        </Tooltip>
         <SelectPill
           ariaLabel="选择画幅"
+          openDirection="up"
           onChange={setRatio}
           options={videoRatioOptions}
           value={ratio}
         />
         <SelectPill
           ariaLabel="选择时长"
+          openDirection="up"
           onChange={setDuration}
           options={videoDurationOptions}
           value={duration}
         />
         <SelectPill
           ariaLabel="选择清晰度"
+          openDirection="up"
           onChange={setResolution}
           options={
             modelMode === "flash"
@@ -274,30 +303,44 @@ function getImageExtension(mimeType: string) {
 
 function SelectPill<TValue extends string>({
   ariaLabel,
+  className,
+  openDirection = "down",
   onChange,
   options,
   value,
 }: {
   ariaLabel: string;
+  className?: string;
+  openDirection?: "down" | "up";
   onChange: (value: TValue) => void;
   options: Array<{ value: TValue; label: string }>;
   value: TValue;
 }) {
   return (
-    <div className="relative flex h-9 min-w-0 items-center rounded-full border-border bg-background [border-width:var(--ui-border-width)]">
-      <select
-        aria-label={ariaLabel}
-        className="h-full w-full appearance-none rounded-full bg-transparent pl-4 pr-9 text-sm outline-none"
-        onChange={(event) => onChange(event.target.value as TValue)}
+    <div className={cn("min-w-0", className)}>
+      <Select
+        onValueChange={(nextValue) => onChange(nextValue as TValue)}
         value={value}
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3 size-4 text-muted-foreground" />
+        <SelectTrigger
+          aria-label={ariaLabel}
+          className="h-9 w-full min-w-0 rounded-full border-border bg-background shadow-none [border-width:var(--ui-border-width)]"
+          iconDirection={openDirection}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent
+          position={openDirection === "up" ? "popper" : "item-aligned"}
+          side={openDirection === "up" ? "top" : "bottom"}
+          sideOffset={openDirection === "up" ? 6 : 0}
+        >
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

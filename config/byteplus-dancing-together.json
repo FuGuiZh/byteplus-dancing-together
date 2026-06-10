@@ -6,11 +6,11 @@
     "openApiProtocol": "https"
   },
   "generation": {
-    "defaultRatio": "9:16",
-    "defaultDuration": 8,
-    "defaultResolution": "720p",
+    "defaultRatio": "16:9",
+    "defaultDuration": 4,
+    "defaultResolution": "480p",
     "defaultGenerateAudio": true,
-    "defaultUseFastEndpoint": false,
+    "defaultUseFastEndpoint": true,
     "defaultWatermark": false
   },
   "polling": {

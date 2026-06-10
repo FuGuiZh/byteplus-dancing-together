@@ -11,6 +11,13 @@ import type {
   UploadedImage,
 } from "@/components/text-to-video/types";
 import { ResultVideoCard } from "@/components/text-to-video/result-video-card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 type AssistantMessage = Exclude<ConversationMessage, { type: "user" }>;
 
@@ -395,15 +402,17 @@ function AssistantTurnShell({
     <div className="group/message w-full min-w-0 max-w-full overflow-hidden">
       {children}
       <div className="mt-2 flex h-7 items-center opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">
-        <button
+        <Button
           aria-label={copied ? "已复制" : "复制内容"}
-          className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="size-7 rounded-full border-transparent p-0 text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
           onClick={handleCopy}
+          size="icon"
           title={copied ? "已复制" : "复制内容"}
           type="button"
+          variant="ghost"
         >
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -426,41 +435,44 @@ function ApiResponsePanel({
     : undefined;
 
   return (
-    <div className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-[calc(var(--ui-radius)*1.2)] border-border bg-card p-4 [border-width:var(--ui-border-width)] [box-shadow:var(--ui-shadow-xs)]">
-      <button
-        className="flex w-full items-center justify-between gap-4 text-left"
-        onClick={() => setOpen((current) => !current)}
-        type="button"
-      >
+    <Collapsible
+      className="box-border w-full min-w-0 max-w-full overflow-hidden rounded-[calc(var(--ui-radius)*1.2)] border-border bg-card p-4 [border-width:var(--ui-border-width)] [box-shadow:var(--ui-shadow-xs)]"
+      onOpenChange={setOpen}
+      open={open}
+    >
+      <CollapsibleTrigger asChild>
+        <Button
+          className="h-auto w-full justify-between gap-4 border-0 border-transparent p-0 text-left shadow-none [border-width:0] hover:border-transparent hover:bg-transparent active:translate-x-0 active:translate-y-0"
+          type="button"
+          variant="ghost"
+        >
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
             <ToggleIcon className="size-4 shrink-0" />
             <span>{message.action}</span>
-            <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[11px]">
+            <Badge className="font-mono text-[11px]" variant="secondary">
               {message.method}
-            </span>
+            </Badge>
             {message.durationMs !== undefined ? (
-              <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[11px]">
+              <Badge className="font-mono text-[11px]" variant="secondary">
                 {message.durationMs}ms
-              </span>
+              </Badge>
             ) : null}
-            <span
-              className={
-                message.ok
-                  ? "rounded-full bg-success px-2 py-0.5 text-[11px] text-primary-foreground"
-                  : "rounded-full bg-destructive px-2 py-0.5 text-[11px] text-destructive-foreground"
-              }
+            <Badge
+              className="text-[11px]"
+              variant={message.ok ? "success" : "destructive"}
             >
               HTTP {message.status || "ERR"}
-            </span>
+            </Badge>
           </div>
           <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
             {message.path}
           </div>
         </div>
-      </button>
+        </Button>
+      </CollapsibleTrigger>
 
-      {open ? (
+      <CollapsibleContent>
         <div className="mt-4 grid w-full min-w-0 max-w-full gap-3 overflow-hidden">
           {requestJson ? (
             <JsonBlock label="Request JSON" value={requestJson} />
@@ -470,8 +482,8 @@ function ApiResponsePanel({
           ) : null}
           <JsonBlock label="Response JSON" value={responseJson} />
         </div>
-      ) : null}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

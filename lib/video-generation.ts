@@ -19,6 +19,13 @@ export type VideoRatio =
   | "21:9"
   | "adaptive";
 
+export const defaultTextToVideoSettings = {
+  duration: "4" as VideoDuration,
+  modelMode: "flash" as VideoModelMode,
+  ratio: "16:9" as VideoRatio,
+  resolution: "480p" as VideoResolution,
+};
+
 export const videoTaskStatuses: VideoTaskStatus[] = [
   "queued",
   "running",

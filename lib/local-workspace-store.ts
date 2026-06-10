@@ -90,6 +90,7 @@ const sessionFilesDirectoryName = "text-to-video-sessions/sessions";
 const sessionIndexFileName = "text-to-video-sessions/index.json";
 const generatedAssetsFileName = "generated-content-assets.json";
 const generatedVideosDirectoryName = "generated-content-assets/videos";
+let generatedContentAssetDownloadQueue: Promise<void> = Promise.resolve();
 
 function createEmptySessionState(): TextToVideoSessionState {
   return {
@@ -608,6 +609,21 @@ function createPendingDownloadAsset(asset: GeneratedContentAsset, reason: string
   });
 }
 
+function countGeneratedAssetDownloadStatus(
+  summary: GeneratedContentAssetSyncSummary,
+  asset: GeneratedContentAsset
+) {
+  if (asset.downloadStatus === "downloaded") {
+    summary.downloadedAssets += 1;
+  } else if (asset.downloadStatus === "failed") {
+    summary.failedDownloads += 1;
+  } else if (asset.downloadStatus === "remote_missing") {
+    summary.remoteMissing += 1;
+  } else if (asset.downloadStatus === "pending") {
+    summary.pendingDownloads += 1;
+  }
+}
+
 async function fetchWithTimeout(url: string, timeoutMs: number) {
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
@@ -698,6 +714,72 @@ async function writeGeneratedContentAssetState(state: GeneratedContentAssetState
     version: 1,
     assets: orderAssetsByCreatedAt(state.assets).map(serializeGeneratedAssetForStorage),
   } satisfies GeneratedContentAssetState);
+}
+
+async function updateGeneratedContentAssetDownload(
+  downloadedAsset: GeneratedContentAsset
+) {
+  const state = await readGeneratedContentAssetState();
+  const currentAssets = new Map(state.assets.map((asset) => [asset.id, asset]));
+  const current = currentAssets.get(downloadedAsset.id);
+
+  if (!current) {
+    return;
+  }
+
+  currentAssets.set(
+    downloadedAsset.id,
+    hydrateGeneratedAsset({
+      ...current,
+      localVideoPath: downloadedAsset.localVideoPath,
+      downloadStatus: downloadedAsset.downloadStatus,
+      downloadedAt: downloadedAsset.downloadedAt,
+      fileSizeBytes: downloadedAsset.fileSizeBytes,
+      downloadError: downloadedAsset.downloadError,
+      updatedAt: Date.now(),
+    })
+  );
+
+  await writeGeneratedContentAssetState({
+    version: 1,
+    assets: [...currentAssets.values()],
+  });
+}
+
+async function downloadPendingGeneratedContentAssets(
+  options: GeneratedContentAssetSyncOptions = {}
+) {
+  const downloadLimit = Math.max(0, options.downloadLimit ?? 20);
+  const downloadTimeoutMs = Math.max(1000, options.downloadTimeoutMs ?? 12000);
+  const state = await readGeneratedContentAssetState();
+  const pendingAssets = state.assets
+    .filter(
+      (asset) =>
+        asset.downloadStatus === "pending" &&
+        Boolean(asset.remoteVideoUrl)
+    )
+    .slice(0, downloadLimit);
+
+  for (const asset of pendingAssets) {
+    const downloadedAsset = await ensureLocalVideoDownloaded(
+      asset,
+      downloadTimeoutMs
+    );
+    await updateGeneratedContentAssetDownload(downloadedAsset);
+  }
+}
+
+export function queueGeneratedContentAssetDownloads(
+  options: GeneratedContentAssetSyncOptions = {}
+) {
+  generatedContentAssetDownloadQueue = generatedContentAssetDownloadQueue
+    .catch(() => undefined)
+    .then(() => downloadPendingGeneratedContentAssets(options))
+    .catch((error) => {
+      console.error("[generated-content-assets] background download failed", error);
+    });
+
+  return generatedContentAssetDownloadQueue;
 }
 
 export function getLocalWorkspaceStorageInfo() {
@@ -793,7 +875,6 @@ export async function syncGeneratedContentAssetsFromTasks(
 ) {
   const startedAt = new Date();
   const downloadLimit = Math.max(0, options.downloadLimit ?? 8);
-  const downloadTimeoutMs = Math.max(1000, options.downloadTimeoutMs ?? 12000);
   const currentState = await readGeneratedContentAssetState();
   const sessionState = await readTextToVideoSessionState();
   const contexts = extractTaskContextsFromSessions(sessionState);
@@ -811,9 +892,8 @@ export async function syncGeneratedContentAssetsFromTasks(
     pendingDownloads: 0,
     skippedTasks: 0,
     downloadLimit,
-    downloadTimeoutMs,
+    downloadTimeoutMs: Math.max(1000, options.downloadTimeoutMs ?? 12000),
   } satisfies GeneratedContentAssetSyncSummary;
-  let attemptedDownloads = 0;
 
   for (const task of tasks) {
     const importedAsset = normalizeProviderTaskToAsset(task, contexts);
@@ -838,41 +918,30 @@ export async function syncGeneratedContentAssetsFromTasks(
       fileSizeBytes: current?.fileSizeBytes,
       updatedAt: Date.now(),
     } satisfies GeneratedContentAsset;
-    const existingFileSize = await getExistingFileSize(mergedAsset.localVideoPath);
-    const downloadedAsset = existingFileSize
+    const localVideoPath = mergedAsset.localVideoPath ?? getGeneratedVideoFilePath(mergedAsset);
+    const existingFileSize = await getExistingFileSize(localVideoPath);
+    const nextAsset = existingFileSize
       ? hydrateGeneratedAsset({
           ...mergedAsset,
+          localVideoPath,
           downloadStatus: "downloaded",
           fileSizeBytes: existingFileSize,
           downloadError: undefined,
         })
-      : !mergedAsset.remoteVideoUrl
-        ? await ensureLocalVideoDownloaded(mergedAsset, downloadTimeoutMs)
-        : attemptedDownloads < downloadLimit
-          ? await (async () => {
-              attemptedDownloads += 1;
-              return ensureLocalVideoDownloaded(mergedAsset, downloadTimeoutMs);
-            })()
-          : createPendingDownloadAsset(
-              mergedAsset,
-              `本次同步已达到下载上限 ${downloadLimit} 个视频；再次点击同步会继续尝试未下载项。`
-            );
+      : createPendingDownloadAsset(
+          {
+            ...mergedAsset,
+            localVideoPath,
+          },
+          "已创建视频占位，后台下载队列会继续保存本地文件。"
+        );
 
     if (!current) {
       summary.importedAssets += 1;
     }
 
-    if (downloadedAsset.downloadStatus === "downloaded") {
-      summary.downloadedAssets += 1;
-    } else if (downloadedAsset.downloadStatus === "failed") {
-      summary.failedDownloads += 1;
-    } else if (downloadedAsset.downloadStatus === "remote_missing") {
-      summary.remoteMissing += 1;
-    } else if (downloadedAsset.downloadStatus === "pending") {
-      summary.pendingDownloads += 1;
-    }
-
-    currentAssets.set(downloadedAsset.id, downloadedAsset);
+    countGeneratedAssetDownloadStatus(summary, nextAsset);
+    currentAssets.set(nextAsset.id, nextAsset);
   }
 
   const nextState = {

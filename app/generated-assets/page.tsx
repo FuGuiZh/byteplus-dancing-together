@@ -1,10 +1,5 @@
-import { AppShell } from "@/components/app-shell";
-import { GeneratedContentAssetsWorkspace } from "@/components/generated-content-assets-workspace";
+import { redirect } from "next/navigation";
 
 export default function GeneratedAssetsPage() {
-  return (
-    <AppShell>
-      <GeneratedContentAssetsWorkspace />
-    </AppShell>
-  );
+  redirect("/generated-videos");
 }

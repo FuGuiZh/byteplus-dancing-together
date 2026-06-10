@@ -10,10 +10,18 @@ import {
   VolumeX,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 type IconBubbleProps = {
   children: React.ReactNode;
   href?: string;
   label: string;
+  onClick?: () => void;
 };
 
 export function ResultVideoCard({ videoUrl }: { videoUrl?: string }) {
@@ -102,28 +110,32 @@ export function ResultVideoCard({ videoUrl }: { videoUrl?: string }) {
         </IconBubble>
       </div>
       {videoUrl && !isPlaying ? (
-        <button
+        <Button
           aria-label={isReady ? "播放视频" : "加载视频"}
-          className="absolute left-1/2 top-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-background/75 text-foreground backdrop-blur transition hover:bg-background/90"
+          className="absolute left-1/2 top-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-transparent bg-background/75 p-0 text-foreground shadow-none backdrop-blur hover:bg-background/90"
           onClick={togglePlay}
+          size="icon"
           type="button"
+          variant="ghost"
         >
           {isReady ? (
             <Play className="ml-1 size-6 fill-current" />
           ) : (
             <span className="size-2 animate-pulse rounded-full bg-current" />
           )}
-        </button>
+        </Button>
       ) : null}
       {videoUrl && isPlaying ? (
-        <button
+        <Button
           aria-label="暂停视频"
-          className="absolute left-1/2 top-1/2 hidden size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-background/65 text-foreground backdrop-blur transition hover:bg-background/85 group-hover:flex"
+          className="absolute left-1/2 top-1/2 hidden size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-transparent bg-background/65 p-0 text-foreground shadow-none backdrop-blur hover:bg-background/85 group-hover:flex"
           onClick={togglePlay}
+          size="icon"
           type="button"
+          variant="ghost"
         >
           <Pause className="size-6 fill-current" />
-        </button>
+        </Button>
       ) : null}
       {loadError ? (
         <div className="absolute inset-x-5 bottom-5 rounded-[var(--ui-radius)] bg-background/90 p-4 text-sm text-foreground shadow-lg backdrop-blur">
@@ -146,28 +158,46 @@ export function ResultVideoCard({ videoUrl }: { videoUrl?: string }) {
   );
 }
 
-function IconBubble({ children, href, label, onClick }: IconBubbleProps & { onClick?: () => void }) {
+function IconBubble({ children, href, label, onClick }: IconBubbleProps) {
   const className =
-    "flex size-12 items-center justify-center rounded-full bg-background/65 text-foreground backdrop-blur hover:bg-background/85";
+    "size-12 rounded-full border-transparent bg-background/65 p-0 text-foreground shadow-none backdrop-blur hover:bg-background/85";
 
   if (href) {
     return (
-      <a
-        aria-label={label}
-        className={className}
-        href={href}
-        rel="noreferrer"
-        target="_blank"
-      >
-        {children}
-      </a>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button asChild className={className} size="icon" variant="ghost">
+            <a
+              aria-label={label}
+              href={href}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {children}
+            </a>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
     );
   }
 
   return (
-    <button aria-label={label} className={className} onClick={onClick} type="button">
-      {children}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={label}
+          className={className}
+          onClick={onClick}
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
 

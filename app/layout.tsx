@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { ThemeSync } from "@/components/theme-sync";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 import "./globals.css";
 
@@ -28,8 +29,10 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <ThemeSync />
-        {children}
+        <TooltipProvider>
+          <ThemeSync />
+          {children}
+        </TooltipProvider>
       </body>
     </html>
   );
