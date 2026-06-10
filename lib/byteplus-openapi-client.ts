@@ -70,6 +70,8 @@ type AssetGroupListResult = {
 };
 
 const DEFAULT_ASSET_GROUP_TYPE = "AIGC";
+const DEFAULT_PAGE_NUMBER = 1;
+const DEFAULT_PAGE_SIZE = 20;
 
 function requireIamCredential(
   config: BytePlusConfig,
@@ -224,8 +226,8 @@ export async function listBytePlusAssetGroups(
         Name: filters.name,
         GroupType: filters.groupType ?? DEFAULT_ASSET_GROUP_TYPE,
       },
-      PageNumber: filters.pageNumber,
-      PageSize: filters.pageSize,
+      PageNumber: filters.pageNumber ?? DEFAULT_PAGE_NUMBER,
+      PageSize: filters.pageSize ?? DEFAULT_PAGE_SIZE,
       SortBy: filters.sortBy,
       SortOrder: filters.sortOrder,
     })
@@ -356,8 +358,8 @@ export async function listBytePlusAssets(
         Name: filters.name,
       },
       AssetType: filters.assetKind,
-      PageNumber: filters.pageNumber,
-      PageSize: filters.pageSize,
+      PageNumber: filters.pageNumber ?? DEFAULT_PAGE_NUMBER,
+      PageSize: filters.pageSize ?? DEFAULT_PAGE_SIZE,
       SortBy: filters.sortBy,
       SortOrder: filters.sortOrder,
     })
