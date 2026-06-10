@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getErrorStatus, toErrorPayload } from "@/lib/api-request";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, isPubliclyReachableHostname } from "@/lib/app-url";
 import {
   getBytePlusConfig,
   shouldUseLocalBytePlusFallback,
@@ -50,33 +50,6 @@ function getPublicUrlWarning(publicUrl: string) {
   }
 
   return undefined;
-}
-
-function isPubliclyReachableHostname(hostname: string) {
-  if (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname.endsWith(".local")
-  ) {
-    return false;
-  }
-
-  if (/^10\./.test(hostname)) {
-    return false;
-  }
-
-  if (/^192\.168\./.test(hostname)) {
-    return false;
-  }
-
-  const private172Match = /^172\.(\d+)\./.exec(hostname);
-  if (private172Match) {
-    const secondPart = Number(private172Match[1]);
-    return secondPart < 16 || secondPart > 31;
-  }
-
-  return true;
 }
 
 function getPublicUrlDiagnostic(publicUrl: string) {
@@ -138,7 +111,11 @@ export async function POST(request: Request) {
       });
       const publicUrl = appUrl(
         config,
-        `/api/local/asset-upload-files/${encodeURIComponent(storedFile.fileId)}`
+        `/api/local/asset-upload-files/${encodeURIComponent(storedFile.fileId)}`,
+        {
+          preferRequestOriginForLocalConfig: true,
+          request,
+        }
       );
       const assetInput: AssetUploadRequest = {
         assetKind: "Image",
@@ -155,6 +132,7 @@ export async function POST(request: Request) {
         localPath: storedFile.localPath,
         originalName: storedFile.originalName,
         publicUrl,
+        configuredAppPublicUrl: config.APP_PUBLIC_URL,
         publicUrlDiagnostic: getPublicUrlDiagnostic(publicUrl),
         publicUrlWarning: getPublicUrlWarning(publicUrl),
         size: storedFile.size,

@@ -20,7 +20,7 @@ services:
       - key: BYTEPLUS_REGION
         value: ap-southeast-1
       - key: BYTEPLUS_PROJECT_NAME
-        value: default
+        value: Opencreartor
       - key: APP_PUBLIC_URL
         sync: false
       - key: BYTEPLUS_REAL_PERSON_CALLBACK_URL
