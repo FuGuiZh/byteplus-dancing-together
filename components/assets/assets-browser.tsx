@@ -2,10 +2,7 @@
 
 import * as React from "react";
 import {
-  AudioLines,
   ExternalLink,
-  FileImage,
-  FileVideo,
   Folder,
   FolderPlus,
   Grid2X2,
@@ -13,13 +10,13 @@ import {
   Info,
   List as ListIcon,
   MoreHorizontal,
-  Music,
   RefreshCcw,
   Trash2,
   Wand2,
   XCircle,
 } from "lucide-react";
 
+import { AssetPreview } from "@/components/assets/asset-preview";
 import type {
   AssetGroupItem,
   AssetItem,
@@ -88,7 +85,7 @@ export function AssetsBrowser({
   viewMode: AssetViewMode;
 }) {
   const [dragDepth, setDragDepth] = React.useState(0);
-  const showGroups = scope.type === "root";
+  const showGroups = scope.type === "root" || scope.type === "group-type";
   const isEmpty = groups.length === 0 && assets.length === 0;
   const canDropImages = scope.type === "group";
   const isDraggingFiles = dragDepth > 0;
@@ -449,9 +446,11 @@ function AssetTile({
           onDoubleClick={onOpen}
           type="button"
         >
-          <div className="mb-4 flex size-20 items-center justify-center rounded-[var(--ui-radius)] bg-muted text-foreground">
-            <AssetLargeIcon assetKind={asset.assetKind} />
-          </div>
+          <AssetPreview
+            asset={asset}
+            className="mb-4 size-24 border-border text-foreground [border-width:var(--ui-border-width)]"
+            iconClassName="size-9"
+          />
           <span className="line-clamp-2 min-h-10 max-w-full text-sm font-bold">
             {asset.name}
           </span>
@@ -578,7 +577,11 @@ function AssetsListView({
                 type="button"
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  {renderAssetIcon(asset)}
+                  <AssetPreview
+                    asset={asset}
+                    className="size-9 border-border [border-width:var(--ui-border-width)]"
+                    iconClassName="size-4"
+                  />
                   <span className="truncate font-bold">{asset.name}</span>
                 </span>
                 <span className="min-w-0 truncate text-sm">
@@ -658,40 +661,4 @@ function StatusBadge({ asset }: { asset: AssetItem }) {
       {getAssetStatusLabel(asset.status)}
     </Badge>
   );
-}
-
-function renderAssetIcon(asset: AssetItem) {
-  return <AssetSmallIcon assetKind={asset.assetKind} />;
-}
-
-function AssetLargeIcon({ assetKind }: { assetKind: string }) {
-  if (assetKind === "Video") {
-    return <FileVideo className="size-9" />;
-  }
-
-  if (assetKind === "Audio") {
-    return <Music className="size-9" />;
-  }
-
-  if (assetKind === "Image") {
-    return <FileImage className="size-9" />;
-  }
-
-  return <AudioLines className="size-9" />;
-}
-
-function AssetSmallIcon({ assetKind }: { assetKind: string }) {
-  if (assetKind === "Video") {
-    return <FileVideo className="size-4 shrink-0 text-muted-foreground" />;
-  }
-
-  if (assetKind === "Audio") {
-    return <Music className="size-4 shrink-0 text-muted-foreground" />;
-  }
-
-  if (assetKind === "Image") {
-    return <FileImage className="size-4 shrink-0 text-muted-foreground" />;
-  }
-
-  return <AudioLines className="size-4 shrink-0 text-muted-foreground" />;
 }

@@ -267,12 +267,12 @@ export function filterVisibleAssets(
 ) {
   const query = searchQuery.trim().toLowerCase();
 
+  if (scope.type === "root" || scope.type === "group-type") {
+    return [];
+  }
+
   return assets.filter((asset) => {
     if (scope.type === "group" && asset.groupId !== scope.groupId) {
-      return false;
-    }
-
-    if (scope.type === "group-type" && asset.groupType && asset.groupType !== scope.groupType) {
       return false;
     }
 
@@ -310,11 +310,15 @@ export function filterVisibleGroups(
 ) {
   const query = searchQuery.trim().toLowerCase();
 
-  if (scope.type !== "root") {
+  if (scope.type !== "root" && scope.type !== "group-type") {
     return [];
   }
 
   return groups.filter((group) => {
+    if (scope.type === "group-type" && group.groupType !== scope.groupType) {
+      return false;
+    }
+
     if (!query) {
       return true;
     }

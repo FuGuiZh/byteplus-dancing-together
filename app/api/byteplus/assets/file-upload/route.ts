@@ -10,7 +10,12 @@ import type { AssetUploadRequest } from "@/lib/byteplus-contracts";
 import { BytePlusServiceError } from "@/lib/byteplus-errors";
 import { createLocalFallbackAsset } from "@/lib/byteplus-local-fallback";
 import { createBytePlusAsset } from "@/lib/byteplus-openapi-client";
-import { storeAssetUploadImage } from "@/lib/local-asset-upload-store";
+import {
+  assetImageDimensionLimits,
+  getAssetImageDimensionError,
+  readAssetImageDimensions,
+  storeAssetUploadImage,
+} from "@/lib/local-asset-upload-store";
 
 function readString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -104,9 +109,56 @@ export async function POST(request: Request) {
 
     for (const file of files) {
       const buffer = Buffer.from(await file.arrayBuffer());
+      const dimensions = readAssetImageDimensions({
+        buffer,
+        contentType: file.type || "image/png",
+        originalName: file.name || "uploaded-image.png",
+      });
+      const dimensionError = getAssetImageDimensionError(dimensions);
+      const baseFileInfo = {
+        contentType: file.type || "image/png",
+        dimensions,
+        dimensionLimits: assetImageDimensionLimits,
+        originalName: file.name || "uploaded-image.png",
+        size: buffer.byteLength,
+      };
+      const fileName = file.name || "uploaded-image.png";
+      const assetName = getFileAssetName(
+        file,
+        files.length === 1 ? requestedName : undefined
+      );
+      const pendingAssetInput: AssetUploadRequest = {
+        assetKind: "Image",
+        fileName,
+        groupId,
+        moderationStrategy,
+        name: assetName,
+        purpose: "reference",
+      };
+
+      if (dimensionError) {
+        uploaded.push({
+          ok: false,
+          assetInput: pendingAssetInput,
+          error: {
+            code: dimensionError.code,
+            message: dimensionError.message,
+            diagnostic: {
+              dimensions,
+              limits: assetImageDimensionLimits,
+              source:
+                "BytePlus CreateAsset 图片素材要求宽高像素都在 300px 到 6000px 之间。",
+            },
+          },
+          file: baseFileInfo,
+        });
+        continue;
+      }
+
       const storedFile = await storeAssetUploadImage({
         buffer,
         contentType: file.type || "image/png",
+        dimensions,
         originalName: file.name || "uploaded-image.png",
       });
       const publicUrl = appUrl(
@@ -118,16 +170,14 @@ export async function POST(request: Request) {
         }
       );
       const assetInput: AssetUploadRequest = {
-        assetKind: "Image",
+        ...pendingAssetInput,
         fileName: storedFile.originalName,
-        groupId,
-        moderationStrategy,
-        name: getFileAssetName(file, files.length === 1 ? requestedName : undefined),
-        purpose: "reference",
         url: publicUrl,
       };
       const fileInfo = {
+        ...baseFileInfo,
         contentType: storedFile.contentType,
+        dimensions: storedFile.dimensions,
         fileId: storedFile.fileId,
         localPath: storedFile.localPath,
         originalName: storedFile.originalName,

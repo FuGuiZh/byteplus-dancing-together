@@ -12,6 +12,7 @@ import {
   Wand2,
 } from "lucide-react";
 
+import { AssetPreview } from "@/components/assets/asset-preview";
 import { AssetsCodePanel } from "@/components/assets/assets-code-panel";
 import type {
   ApiSnapshot,
@@ -380,6 +381,11 @@ function AssetDetail({
 }) {
   return (
     <div className="space-y-3">
+      <AssetPreview
+        asset={asset}
+        className="aspect-video w-full border-border [border-width:var(--ui-border-width)]"
+        iconClassName="size-10"
+      />
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate text-sm font-bold">{asset.name}</div>
