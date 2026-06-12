@@ -11,15 +11,19 @@ export function AssetPreview({
   className,
   iconClassName,
   imageClassName,
+  videoControls = false,
 }: {
   asset: Pick<AssetItem, "assetKind" | "name" | "url">;
   className?: string;
   iconClassName?: string;
   imageClassName?: string;
+  videoControls?: boolean;
 }) {
   const [failedUrl, setFailedUrl] = React.useState<string | null>(null);
   const canPreviewImage =
     asset.assetKind === "Image" && asset.url && failedUrl !== asset.url;
+  const canPreviewVideo =
+    asset.assetKind === "Video" && asset.url && failedUrl !== asset.url;
 
   return (
     <div
@@ -38,6 +42,17 @@ export function AssetPreview({
           loading="lazy"
           onError={() => setFailedUrl(asset.url)}
           referrerPolicy="no-referrer"
+          src={asset.url}
+        />
+      ) : canPreviewVideo ? (
+        <video
+          aria-label={asset.name || "视频素材预览"}
+          className={cn("h-full w-full object-cover", imageClassName)}
+          controls={videoControls}
+          muted={!videoControls}
+          onError={() => setFailedUrl(asset.url)}
+          playsInline
+          preload="metadata"
           src={asset.url}
         />
       ) : (

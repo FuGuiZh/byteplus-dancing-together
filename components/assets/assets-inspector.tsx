@@ -67,7 +67,7 @@ export function AssetsInspector({
   onDeleteSelection,
   onFetchDetail,
   onGroupFormChange,
-  onUploadImages,
+  onUploadFiles,
   onOpenAsset,
   onRenameSelection,
   selectedAsset,
@@ -84,7 +84,7 @@ export function AssetsInspector({
   onDeleteSelection: () => void;
   onFetchDetail: () => void;
   onGroupFormChange: (next: AssetGroupFormState) => void;
-  onUploadImages: () => void;
+  onUploadFiles: () => void;
   onOpenAsset: (asset: AssetItem) => void;
   onRenameSelection: () => void;
   selectedAsset: AssetItem | null;
@@ -150,7 +150,7 @@ export function AssetsInspector({
         <section className="min-w-0 max-w-full overflow-hidden rounded-[var(--ui-radius)] border-border bg-card p-4 [border-width:var(--ui-border-width)]">
           <div className="mb-3 flex items-center gap-2 text-sm font-bold">
             <ImageUp className="size-4" />
-            本地图片入库
+            本地文件入库
           </div>
           <div className="grid gap-3">
             <Select
@@ -189,16 +189,18 @@ export function AssetsInspector({
             </Select>
             <Button
               disabled={busy || (!assetForm.groupId && !selectedGroup)}
-              onClick={onUploadImages}
+              onClick={onUploadFiles}
               type="button"
               variant="outline"
             >
               <ImageUp className="size-4" />
-              选择图片并提交
+              选择文件并提交
             </Button>
             <p className="break-words text-xs leading-5 text-muted-foreground">
-              文件会先保存到本地用户目录，再通过 APP_PUBLIC_URL 暴露给 BytePlus
-              拉取并执行 CreateAsset；localhost 地址通常不能被公网服务访问。
+              支持图片 jpeg/png/webp/bmp/tiff/gif/heic/heif、视频 mp4/mov
+              和音频 mp3/wav。前端和后端会先拦截格式、大小、图片宽高与图片比例；
+              视频时长、分辨率、编码、FPS 和音频时长由 BytePlus CreateAsset
+              终检并返回原始错误。
             </p>
           </div>
         </section>
@@ -385,6 +387,7 @@ function AssetDetail({
         asset={asset}
         className="aspect-video w-full border-border [border-width:var(--ui-border-width)]"
         iconClassName="size-10"
+        videoControls
       />
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">

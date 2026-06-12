@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  copyFile,
   mkdir,
   readFile,
   readdir,
@@ -306,12 +307,52 @@ async function readJsonFile(filePath: string) {
   }
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function replaceFileWithRetry(tempFilePath: string, filePath: string) {
+  const transientErrorCodes = new Set(["EPERM", "EACCES", "EBUSY"]);
+  const retryDelaysMs = [30, 80, 160, 320];
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+    try {
+      await rename(tempFilePath, filePath);
+      return;
+    } catch (error) {
+      lastError = error;
+      const errorCode =
+        error instanceof Error && "code" in error
+          ? String(error.code)
+          : undefined;
+
+      if (!errorCode || !transientErrorCodes.has(errorCode)) {
+        throw error;
+      }
+
+      if (attempt < retryDelaysMs.length) {
+        await sleep(retryDelaysMs[attempt]);
+      }
+    }
+  }
+
+  try {
+    await copyFile(tempFilePath, filePath);
+    await rm(tempFilePath, { force: true });
+  } catch {
+    throw lastError;
+  }
+}
+
 async function writeJsonFile(filePath: string, value: unknown) {
   await mkdir(dirname(filePath), { recursive: true });
 
   const tempFilePath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(tempFilePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-  await rename(tempFilePath, filePath);
+  await replaceFileWithRetry(tempFilePath, filePath);
 }
 
 function sanitizeFilePart(value: string) {

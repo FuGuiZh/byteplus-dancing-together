@@ -47,7 +47,7 @@ export function AssetsToolbar({
   onRenameSelection,
   onSearchChange,
   onStatusFilterChange,
-  onUploadImages,
+  onUploadFiles,
   onViewModeChange,
   searchQuery,
   selected,
@@ -65,7 +65,7 @@ export function AssetsToolbar({
   onRenameSelection: () => void;
   onSearchChange: (value: string) => void;
   onStatusFilterChange: (value: "all" | AssetStatus) => void;
-  onUploadImages: () => void;
+  onUploadFiles: () => void;
   onViewModeChange: (value: AssetViewMode) => void;
   searchQuery: string;
   selected: boolean;
@@ -144,9 +144,9 @@ export function AssetsToolbar({
           <Upload className="size-4" />
           URL 入库
         </Button>
-        <Button onClick={onUploadImages} type="button" variant="outline">
+        <Button onClick={onUploadFiles} type="button" variant="outline">
           <ImageUp className="size-4" />
-          图片入库
+          文件入库
         </Button>
         <Button
           disabled={!selected}

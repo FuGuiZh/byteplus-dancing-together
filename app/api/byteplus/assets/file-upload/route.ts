@@ -11,10 +11,13 @@ import { BytePlusServiceError } from "@/lib/byteplus-errors";
 import { createLocalFallbackAsset } from "@/lib/byteplus-local-fallback";
 import { createBytePlusAsset } from "@/lib/byteplus-openapi-client";
 import {
+  assetImageAspectRatioLimits,
   assetImageDimensionLimits,
-  getAssetImageDimensionError,
+  getAssetUploadValidationError,
+  inferStoredAssetKind,
   readAssetImageDimensions,
-  storeAssetUploadImage,
+  storeAssetUploadFile,
+  supportedAssetUploadSummary,
 } from "@/lib/local-asset-upload-store";
 
 function readString(formData: FormData, key: string) {
@@ -38,7 +41,7 @@ function getFileAssetName(file: File, fallbackName?: string) {
     return fallbackName;
   }
 
-  const fileName = file.name || "uploaded-image";
+  const fileName = file.name || "uploaded-asset";
   const extensionIndex = fileName.lastIndexOf(".");
   return extensionIndex > 0 ? fileName.slice(0, extensionIndex) : fileName;
 }
@@ -74,7 +77,7 @@ function getPublicUrlDiagnostic(publicUrl: string) {
     fix: [
       "把 APP_PUBLIC_URL 改成当前服务的公网 HTTPS 地址，例如 Render 的 https://xxx.onrender.com。",
       "确保上传文件保存目录和当前运行的服务是同一台机器；本地文件不能用 Render 域名代为访问。",
-      "或者先把图片上传到对象存储、CDN、公开静态文件服务，再用 URL 入库。",
+      "或者先把素材上传到对象存储、CDN、公开静态文件服务，再用 URL 入库。",
     ],
   };
 }
@@ -92,15 +95,15 @@ export async function POST(request: Request) {
     if (!groupId) {
       throw new BytePlusServiceError({
         code: "BYTEPLUS_ASSET_GROUP_REQUIRED",
-        message: "图片入库需要先选择素材组。",
+        message: "文件入库需要先选择素材组。",
         status: 400,
       });
     }
 
     if (files.length === 0) {
       throw new BytePlusServiceError({
-        code: "BYTEPLUS_ASSET_IMAGE_REQUIRED",
-        message: "请至少选择一张图片。",
+        code: "BYTEPLUS_ASSET_FILE_REQUIRED",
+        message: "请至少选择一个图片、视频或音频文件。",
         status: 400,
       });
     }
@@ -109,26 +112,39 @@ export async function POST(request: Request) {
 
     for (const file of files) {
       const buffer = Buffer.from(await file.arrayBuffer());
+      const originalName = file.name || "uploaded-asset";
+      const contentType = file.type || "application/octet-stream";
+      const assetKind = inferStoredAssetKind({
+        contentType,
+        originalName,
+      });
       const dimensions = readAssetImageDimensions({
         buffer,
-        contentType: file.type || "image/png",
-        originalName: file.name || "uploaded-image.png",
+        contentType,
+        originalName,
       });
-      const dimensionError = getAssetImageDimensionError(dimensions);
-      const baseFileInfo = {
-        contentType: file.type || "image/png",
+      const validationError = getAssetUploadValidationError({
+        assetKind,
+        buffer,
         dimensions,
+      });
+      const baseFileInfo = {
+        assetKind,
+        contentType,
+        dimensions,
+        aspectRatioLimits: assetImageAspectRatioLimits,
         dimensionLimits: assetImageDimensionLimits,
-        originalName: file.name || "uploaded-image.png",
+        originalName,
+        supported: supportedAssetUploadSummary,
         size: buffer.byteLength,
       };
-      const fileName = file.name || "uploaded-image.png";
+      const fileName = originalName;
       const assetName = getFileAssetName(
         file,
         files.length === 1 ? requestedName : undefined
       );
       const pendingAssetInput: AssetUploadRequest = {
-        assetKind: "Image",
+        assetKind: assetKind ?? "Image",
         fileName,
         groupId,
         moderationStrategy,
@@ -136,18 +152,19 @@ export async function POST(request: Request) {
         purpose: "reference",
       };
 
-      if (dimensionError) {
+      if (validationError) {
         uploaded.push({
           ok: false,
           assetInput: pendingAssetInput,
           error: {
-            code: dimensionError.code,
-            message: dimensionError.message,
+            code: validationError.code,
+            message: validationError.message,
             diagnostic: {
+              assetKind,
               dimensions,
+              aspectRatioLimits: assetImageAspectRatioLimits,
               limits: assetImageDimensionLimits,
-              source:
-                "BytePlus CreateAsset 图片素材要求宽高像素都在 300px 到 6000px 之间。",
+              source: supportedAssetUploadSummary,
             },
           },
           file: baseFileInfo,
@@ -155,11 +172,16 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const storedFile = await storeAssetUploadImage({
+      if (!assetKind) {
+        continue;
+      }
+
+      const storedFile = await storeAssetUploadFile({
+        assetKind,
         buffer,
-        contentType: file.type || "image/png",
+        contentType,
         dimensions,
-        originalName: file.name || "uploaded-image.png",
+        originalName,
       });
       const publicUrl = appUrl(
         config,
@@ -176,6 +198,7 @@ export async function POST(request: Request) {
       };
       const fileInfo = {
         ...baseFileInfo,
+        assetKind: storedFile.assetKind,
         contentType: storedFile.contentType,
         dimensions: storedFile.dimensions,
         fileId: storedFile.fileId,

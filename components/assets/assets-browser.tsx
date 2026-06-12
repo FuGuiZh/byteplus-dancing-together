@@ -56,8 +56,8 @@ export function AssetsBrowser({
   onRefresh,
   onScopeChange,
   onSelect,
-  onUploadImageFiles,
-  onUploadImages,
+  onUploadFiles,
+  onUploadFilesPicker,
   onViewModeChange,
   scope,
   selection,
@@ -77,8 +77,8 @@ export function AssetsBrowser({
   onRefresh: () => void;
   onScopeChange: (scope: AssetScope) => void;
   onSelect: (selection: AssetSelection) => void;
-  onUploadImageFiles: (files: File[], groupId: string) => void;
-  onUploadImages: () => void;
+  onUploadFiles: (files: File[], groupId: string) => void;
+  onUploadFilesPicker: () => void;
   onViewModeChange: (value: AssetViewMode) => void;
   scope: AssetScope;
   selection: AssetSelection;
@@ -87,7 +87,7 @@ export function AssetsBrowser({
   const [dragDepth, setDragDepth] = React.useState(0);
   const showGroups = scope.type === "root" || scope.type === "group-type";
   const isEmpty = groups.length === 0 && assets.length === 0;
-  const canDropImages = scope.type === "group";
+  const canDropFiles = scope.type === "group";
   const isDraggingFiles = dragDepth > 0;
   const dropTargetGroupId = scope.type === "group" ? scope.groupId : "";
 
@@ -98,7 +98,7 @@ export function AssetsBrowser({
 
     event.preventDefault();
 
-    if (canDropImages) {
+    if (canDropFiles) {
       setDragDepth((current) => current + 1);
     }
   }
@@ -109,7 +109,7 @@ export function AssetsBrowser({
     }
 
     event.preventDefault();
-    event.dataTransfer.dropEffect = canDropImages ? "copy" : "none";
+    event.dataTransfer.dropEffect = canDropFiles ? "copy" : "none";
   }
 
   function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
@@ -119,7 +119,7 @@ export function AssetsBrowser({
 
     event.preventDefault();
 
-    if (canDropImages) {
+    if (canDropFiles) {
       setDragDepth((current) => Math.max(0, current - 1));
     }
   }
@@ -132,19 +132,19 @@ export function AssetsBrowser({
     event.preventDefault();
     setDragDepth(0);
 
-    if (!canDropImages || !dropTargetGroupId) {
-      onDropRejected("请先打开一个素材组，再把本地图片拖拽到素材文件区入库。");
+    if (!canDropFiles || !dropTargetGroupId) {
+      onDropRejected("请先打开一个素材组，再把本地素材文件拖拽到素材文件区入库。");
       return;
     }
 
-    const imageFiles = getImageFilesFromDataTransfer(event.dataTransfer);
+    const assetFiles = getSupportedAssetFilesFromDataTransfer(event.dataTransfer);
 
-    if (imageFiles.length === 0) {
-      onDropRejected("拖拽内容里没有可入库的图片文件。");
+    if (assetFiles.length === 0) {
+      onDropRejected("拖拽内容里没有可入库的图片、视频或音频文件。");
       return;
     }
 
-    onUploadImageFiles(imageFiles, dropTargetGroupId);
+    onUploadFiles(assetFiles, dropTargetGroupId);
   }
 
   return (
@@ -168,7 +168,7 @@ export function AssetsBrowser({
           <div
             className={cn(
               "relative min-h-0 min-w-0 max-w-full overflow-hidden transition-colors",
-              canDropImages && isDraggingFiles && "bg-primary/5"
+              canDropFiles && isDraggingFiles && "bg-primary/5"
             )}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
@@ -187,11 +187,11 @@ export function AssetsBrowser({
                     </div>
                     <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
                       可以先创建 AIGC 素材组，再用 BytePlus 可访问的 URL
-                      或本地图片文件入库素材。
+                      或本地文件入库素材。
                     </p>
-                    {canDropImages ? (
+                    {canDropFiles ? (
                       <p className="mt-3 text-xs font-bold text-primary">
-                        也可以直接拖拽本地图片到这里，入库到当前素材组。
+                        也可以直接拖拽本地图片、视频或音频到这里，入库到当前素材组。
                       </p>
                     ) : null}
                   </div>
@@ -248,7 +248,7 @@ export function AssetsBrowser({
                 />
               )}
             </ScrollArea>
-            {canDropImages ? (
+            {canDropFiles ? (
               <div
                 className={cn(
                   "pointer-events-none absolute inset-5 z-20 flex items-center justify-center rounded-[var(--ui-radius)] border-2 border-dashed border-primary bg-background/85 text-center shadow-lg backdrop-blur-sm transition-opacity",
@@ -259,9 +259,9 @@ export function AssetsBrowser({
                   <div className="mx-auto flex size-14 items-center justify-center rounded-[var(--ui-radius)] bg-primary text-primary-foreground">
                     <ImageUp className="size-7" />
                   </div>
-                  <div className="mt-4 text-base font-bold">松手后图片入库</div>
+                  <div className="mt-4 text-base font-bold">松手后文件入库</div>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    目标是当前打开的素材组；只会提交图片文件。
+                    目标是当前打开的素材组；只会提交 BytePlus 支持的图片、视频或音频文件。
                   </p>
                 </div>
               </div>
@@ -277,7 +277,7 @@ export function AssetsBrowser({
           onToggleViewMode={() =>
             onViewModeChange(viewMode === "grid" ? "list" : "grid")
           }
-          onUploadImages={onUploadImages}
+          onUploadFiles={onUploadFilesPicker}
           viewMode={viewMode}
         />
       </ContextMenu>
@@ -289,22 +289,42 @@ function hasFileTransfer(dataTransfer: DataTransfer) {
   return Array.from(dataTransfer.types).includes("Files");
 }
 
-function isLikelyImageFile(file: File) {
-  if (file.type.startsWith("image/")) {
+function isLikelySupportedAssetFile(file: File) {
+  const supportedMimeTypes = new Set([
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/wav",
+    "audio/x-wav",
+    "image/bmp",
+    "image/gif",
+    "image/heic",
+    "image/heif",
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/tiff",
+    "image/webp",
+    "video/mp4",
+    "video/quicktime",
+  ]);
+
+  if (supportedMimeTypes.has(file.type.toLowerCase())) {
     return true;
   }
 
-  return /\.(avif|gif|jpe?g|png|webp)$/i.test(file.name);
+  return /\.(bmp|gif|heic|heif|jpe?g|mov|mp3|mp4|png|tiff?|wav|webp)$/i.test(
+    file.name
+  );
 }
 
-function getImageFilesFromDataTransfer(dataTransfer: DataTransfer) {
+function getSupportedAssetFilesFromDataTransfer(dataTransfer: DataTransfer) {
   const itemFiles = Array.from(dataTransfer.items ?? [])
     .filter((item) => item.kind === "file")
     .map((item) => item.getAsFile())
     .filter((file): file is File => Boolean(file));
   const files = itemFiles.length > 0 ? itemFiles : Array.from(dataTransfer.files);
 
-  return files.filter(isLikelyImageFile);
+  return files.filter(isLikelySupportedAssetFile);
 }
 
 function BrowserContextMenu({
@@ -314,7 +334,7 @@ function BrowserContextMenu({
   onCreateGroup,
   onRefresh,
   onToggleViewMode,
-  onUploadImages,
+  onUploadFiles,
   viewMode,
 }: {
   hasSelection: boolean;
@@ -323,14 +343,14 @@ function BrowserContextMenu({
   onCreateGroup: () => void;
   onRefresh: () => void;
   onToggleViewMode: () => void;
-  onUploadImages: () => void;
+  onUploadFiles: () => void;
   viewMode: AssetViewMode;
 }) {
   return (
     <ContextMenuContent className="w-56">
-      <ContextMenuItem onClick={onUploadImages}>
+      <ContextMenuItem onClick={onUploadFiles}>
         <ImageUp className="size-4" />
-        图片文件入库
+        本地文件入库
       </ContextMenuItem>
       <ContextMenuItem onClick={onCreateAsset}>
         <ExternalLink className="size-4" />

@@ -33,6 +33,8 @@ import {
 } from "@/components/assets/assets-utils";
 
 const ASSET_LIST_PAGE_SIZE = 100;
+const SUPPORTED_ASSET_FILE_ACCEPT =
+  "image/jpeg,image/jpg,image/png,image/webp,image/bmp,image/tiff,image/gif,image/heic,image/heif,video/mp4,video/quicktime,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,.jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.gif,.heic,.heif,.mp4,.mov,.mp3,.wav";
 
 const defaultGroupForm: AssetGroupFormState = {
   name: "dance-assets",
@@ -42,7 +44,7 @@ const defaultGroupForm: AssetGroupFormState = {
 const defaultAssetForm: AssetCreateFormState = {
   assetKind: "Image",
   groupId: "",
-  name: "reference-image",
+  name: "reference-asset",
   url: "",
   moderationStrategy: "Default",
 };
@@ -52,7 +54,7 @@ function getErrorMessage(error: unknown) {
 }
 
 export function AssetsWorkspace() {
-  const imageUploadInputRef = React.useRef<HTMLInputElement>(null);
+  const fileUploadInputRef = React.useRef<HTMLInputElement>(null);
   const [groups, setGroups] = React.useState<AssetGroupItem[]>([]);
   const [assets, setAssets] = React.useState<AssetItem[]>([]);
   const [scope, setScope] = React.useState<AssetScope>({ type: "root" });
@@ -294,32 +296,32 @@ export function AssetsWorkspace() {
     );
   }
 
-  function openImageUploadPicker() {
+  function openFileUploadPicker() {
     const groupId = getActiveUploadGroupId();
 
     if (!groupId) {
       setApiSnapshot({
-        label: "图片文件入库",
+        label: "本地文件入库",
         method: "POST",
         path: "/api/byteplus/assets/file-upload",
-        error: "请先刷新或创建一个素材组，再上传图片素材。",
+        error: "请先刷新或创建一个素材组，再上传素材文件。",
       });
       return;
     }
 
     setAssetForm((current) => ({ ...current, groupId }));
-    imageUploadInputRef.current?.click();
+    fileUploadInputRef.current?.click();
   }
 
-  async function uploadImageFiles(files: File[], targetGroupId?: string) {
+  async function uploadAssetFiles(files: File[], targetGroupId?: string) {
     const groupId = targetGroupId ?? getActiveUploadGroupId();
 
     if (!groupId) {
       setApiSnapshot({
-        label: "图片文件入库",
+        label: "本地文件入库",
         method: "POST",
         path: "/api/byteplus/assets/file-upload",
-        error: "请先刷新或创建一个素材组，再上传图片素材。",
+        error: "请先刷新或创建一个素材组，再上传素材文件。",
       });
       return;
     }
@@ -353,7 +355,7 @@ export function AssetsWorkspace() {
 
     try {
       await requestJson(
-        "图片文件入库",
+        "本地文件入库",
         "/api/byteplus/assets/file-upload",
         {
           body: formData,
@@ -367,12 +369,12 @@ export function AssetsWorkspace() {
     }
   }
 
-  function handleImageUploadInputChange(
+  function handleFileUploadInputChange(
     event: React.ChangeEvent<HTMLInputElement>
   ) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    void uploadImageFiles(files);
+    void uploadAssetFiles(files);
   }
 
   async function createGroup() {
@@ -630,11 +632,11 @@ export function AssetsWorkspace() {
   return (
     <>
       <input
-        accept="image/*"
+        accept={SUPPORTED_ASSET_FILE_ACCEPT}
         className="hidden"
         multiple
-        onChange={handleImageUploadInputChange}
-        ref={imageUploadInputRef}
+        onChange={handleFileUploadInputChange}
+        ref={fileUploadInputRef}
         type="file"
       />
       <AssetsFrame
@@ -653,7 +655,7 @@ export function AssetsWorkspace() {
             onRename={renameSelection}
             onDropRejected={(message) =>
               setApiSnapshot({
-                label: "拖拽图片入库",
+                label: "拖拽文件入库",
                 method: "POST",
                 path: "/api/byteplus/assets/file-upload",
                 error: message,
@@ -661,10 +663,10 @@ export function AssetsWorkspace() {
             }
             onScopeChange={handleScopeChange}
             onSelect={setSelection}
-            onUploadImageFiles={(files, groupId) =>
-              void uploadImageFiles(files, groupId)
+            onUploadFiles={(files, groupId) =>
+              void uploadAssetFiles(files, groupId)
             }
-            onUploadImages={openImageUploadPicker}
+            onUploadFilesPicker={openFileUploadPicker}
             onViewModeChange={setViewMode}
             scope={scope}
             selection={selection}
@@ -686,7 +688,7 @@ export function AssetsWorkspace() {
             onGroupFormChange={setGroupForm}
             onOpenAsset={openAsset}
             onRenameSelection={renameSelection}
-            onUploadImages={openImageUploadPicker}
+            onUploadFiles={openFileUploadPicker}
             selectedAsset={selectedAsset}
             selectedGroup={selectedGroup}
           />
@@ -721,7 +723,7 @@ export function AssetsWorkspace() {
             onRenameSelection={renameSelection}
             onSearchChange={setSearchQuery}
             onStatusFilterChange={setStatusFilter}
-            onUploadImages={openImageUploadPicker}
+            onUploadFiles={openFileUploadPicker}
             onViewModeChange={setViewMode}
             searchQuery={searchQuery}
             selected={Boolean(selection)}
